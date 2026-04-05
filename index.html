@@ -3,610 +3,334 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure ECC Messenger</title>
+    <title>Secure ECC Messenger | encryptor.one</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Basic styling for focus states and transitions */
-        input:focus, textarea:focus, select:focus, button:focus {
-            outline: 2px solid transparent;
-            outline-offset: 2px;
-            --tw-ring-color: #3b82f6; /* blue-500 */
-            box-shadow: 0 0 0 2px var(--tw-ring-color);
-        }
-        button {
-            transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-            display: inline-flex; /* Align icon and text */
-            align-items: center;
-            gap: 0.5rem; /* Increased gap for better spacing */
-            justify-content: center; /* Center content in button */
-        }
-        /* Custom scrollbar for textarea */
-        textarea::-webkit-scrollbar {
-            width: 8px;
-        }
-        textarea::-webkit-scrollbar-track {
-            background: #1e293b; /* slate-800 */
-            border-radius: 10px;
-        }
-        textarea::-webkit-scrollbar-thumb {
-            background: #475569; /* slate-600 */
-            border-radius: 10px;
-        }
-        textarea::-webkit-scrollbar-thumb:hover {
-            background: #64748b; /* slate-500 */
-        }
-        /* Style for visually hidden temporary textarea (for copy fallback) */
-        .visually-hidden {
-            position: absolute;
-            width: 1px;
-            height: 1px;
-            padding: 0;
-            margin: -1px;
-            overflow: hidden;
-            clip: rect(0, 0, 0, 0);
-            white-space: nowrap;
-            border: 0;
-        }
-        /* Ensure SVGs within buttons scale with text size and inherit color */
-        button svg {
-            width: 1.1em; /* Size relative to font size */
-            height: 1.1em;
-            stroke: currentColor; /* Inherit text color */
-            flex-shrink: 0; /* Prevent icon shrinking */
-        }
-        /* Specific styling for smaller icons in the contact list */
-        #contactList button svg {
-            width: 1em;
-            height: 1em;
-        }
-        /* Use Inter font */
-        body {
-            font-family: 'Inter', sans-serif;
-        }
+        body { font-family: 'Inter', sans-serif; }
+        .backdrop-blur-md { backdrop-filter: blur(12px); }
+        .hidden-section { display: none; }
+        input:focus, textarea:focus, select:focus { outline: none; ring: 2px; ring-color: #3b82f6; }
+        /* Custom scrollbar for better look */
+        textarea::-webkit-scrollbar { width: 6px; }
+        textarea::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
     </style>
 </head>
-<body class="bg-gradient-to-br from-slate-900 to-slate-800 text-slate-100 font-sans p-4 md:p-8 min-h-screen flex items-center justify-center">
+<body class="bg-gradient-to-br from-slate-900 to-slate-800 text-slate-100 min-h-screen p-4 md:p-8 flex items-center justify-center">
 
-    <div class="bg-slate-800/60 backdrop-blur-md border border-slate-700 rounded-xl shadow-2xl p-6 md:p-8 w-full max-w-3xl space-y-6">
-
-        <header class="text-center">
-            <h1 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">Secure ECC Messenger</h1>
-            <p class="text-sm text-slate-400">Client-side encryption using ECC (P-256) & AES-GCM. New keys & contact list cleared each session.</p>
+    <div id="appContainer" class="bg-slate-800/60 backdrop-blur-md border border-slate-700 rounded-xl shadow-2xl p-6 md:p-8 w-full max-w-3xl space-y-6">
+        
+        <header class="text-center space-y-4">
+            <div>
+                <h1 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">Secure ECC Messenger</h1>
+                <p class="text-[10px] text-slate-500 uppercase tracking-[0.3em] mt-1">encryptor.one</p>
+            </div>
+            
+            <div class="max-w-xl mx-auto py-3 px-4 rounded-xl bg-slate-900/30 border border-slate-700/50 shadow-inner">
+                <p class="text-xs text-slate-400 leading-relaxed">
+                    <span class="text-emerald-400/80 font-semibold">Privacy First:</span> 
+                    This tool uses <strong>ECDH (P-256)</strong> for key exchange and <strong>AES-256-GCM</strong> for encryption. 
+                    Everything happens locally in your browser—your private keys are never transmitted or stored elsewhere.
+                </p>
+            </div>
         </header>
 
-        <div id="statusMessage" class="text-center p-3 rounded-lg text-sm min-h-[44px] flex items-center justify-center transition-colors duration-300" role="alert">
-             <span class="italic text-slate-400">Initializing and generating key pair...</span>
+        <div id="authSection" class="space-y-4 py-10 text-center">
+            <h2 class="text-xl font-semibold">Unlock Vault</h2>
+            <p id="authInstructions" class="text-slate-400 text-sm">Enter your Master Password to access your local keys.</p>
+            <input type="password" id="masterPassword" class="w-full max-w-xs p-3 bg-slate-700 border border-slate-600 rounded-lg text-center shadow-lg" placeholder="Master Password">
+            <div class="flex justify-center gap-3">
+                <button id="unlockBtn" class="px-8 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold transition-all transform active:scale-95 shadow-lg shadow-blue-900/20">Unlock / Setup</button>
+            </div>
+            <p id="attemptsWarning" class="text-[10px] text-slate-500 mt-2 uppercase tracking-widest">3 attempts remaining before local purge</p>
         </div>
 
-        <section class="space-y-2">
-            <h2 class="text-lg font-semibold text-slate-300">Your Current Public Key:</h2>
-            <div class="flex items-center space-x-2">
-                <input type="text" id="myPublicKey" readonly class="flex-grow p-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 text-sm focus:border-blue-500" placeholder="Generating...">
-                <button id="copyPublicKeyBtn" title="Copy Public Key" class="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-800">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-                </button>
-            </div>
-        </section>
+        <div id="mainSection" class="hidden-section space-y-6">
+            
+            <div id="statusMessage" class="text-center p-3 rounded-lg text-sm min-h-[44px] flex items-center justify-center transition-all duration-300 font-medium bg-slate-700/30 text-slate-400 border border-slate-700/50">Ready.</div>
 
-        <section class="space-y-4">
-            <h2 class="text-lg font-semibold text-slate-300">Encrypt / Decrypt Message:</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="space-y-1">
-                     <label for="recipientSelect" class="block text-sm font-medium text-slate-400">Encrypt for Contact / Select Sender:</label>
-                     <select id="recipientSelect" class="w-full p-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:border-blue-500">
-                         <option value="">-- Select Contact --</option>
-                         </select>
-                </div>
-                 <div class="space-y-1">
-                     <label for="recipientPublicKey" class="block text-sm font-medium text-slate-400">Or Paste Recipient/Sender Public Key:</label>
-                     <input type="text" id="recipientPublicKey" class="w-full p-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 text-sm focus:border-blue-500" placeholder="Paste base64 public key here">
-                 </div>
-            </div>
-
-            <textarea id="messageArea" rows="6" class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 focus:border-blue-500 placeholder-slate-500 resize-none" placeholder="Enter plaintext to encrypt or ciphertext (base64) to decrypt..."></textarea>
-
-            <div class="flex flex-wrap justify-between items-center gap-3">
-                <div class="flex gap-3">
-                    <button id="encryptBtn" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium shadow-md focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                        Encrypt
-                    </button>
-                    <button id="decryptBtn" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-medium shadow-md focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 focus:ring-offset-slate-800">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
-                        Decrypt
+            <section class="space-y-2">
+                <div class="flex justify-between items-end">
+                    <h2 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Your Identity</h2>
+                    <button id="shareLinkBtn" class="text-[10px] bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/40 px-3 py-1 rounded-full border border-indigo-500/30 flex items-center gap-1.5 transition-all">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                        Invite Link
                     </button>
                 </div>
-                <div class="flex gap-3">
-                     <button id="copyResultBtn" title="Copy Result" class="px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 focus:ring-offset-slate-800">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-                        Copy Result
-                     </button>
-                     <button id="clearMessageBtn" title="Clear Message Area" class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-slate-800">
-                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>
-                         Clear
-                     </button>
+                <div class="flex items-center space-x-2">
+                    <input type="text" id="myPublicKey" readonly class="flex-grow p-2.5 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-400 text-xs font-mono truncate">
+                    <button id="copyPublicKeyBtn" title="Copy Key" class="p-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors border border-slate-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                    </button>
                 </div>
-            </div>
-        </section>
+            </section>
 
-        <section class="space-y-4 border-t border-slate-700 pt-6">
-            <h2 class="text-lg font-semibold text-slate-300">Contact Management (Session Only):</h2>
-             <p class="text-xs text-slate-400 -mt-3 mb-3">Contacts added here are cleared when the page is reloaded.</p>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                <div class="space-y-1">
-                    <label for="contactName" class="block text-sm font-medium text-slate-400">Contact Name:</label>
-                    <input type="text" id="contactName" class="w-full p-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 text-sm focus:border-blue-500" placeholder="e.g., Alice">
+            <section class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="space-y-1">
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Select Contact</label>
+                        <select id="recipientSelect" class="w-full p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-sm shadow-inner">
+                            <option value="">-- Choose --</option>
+                        </select>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Manual Key</label>
+                        <input type="text" id="recipientPublicKey" class="w-full p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-sm placeholder-slate-500 shadow-inner" placeholder="Base64...">
+                    </div>
                 </div>
-                <div class="space-y-1">
-                    <label for="contactPublicKey" class="block text-sm font-medium text-slate-400">Contact Public Key (Base64):</label>
-                    <input type="text" id="contactPublicKey" class="w-full p-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 text-sm focus:border-blue-500" placeholder="Paste key here">
-                </div>
-                <button id="addContactBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium shadow-md focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-800 h-fit">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
-                    Add Contact
-                </button>
-            </div>
-            <div class="mt-4 space-y-2">
-                <h3 class="text-md font-medium text-slate-400">Saved Contacts (Current Session):</h3>
-                <ul id="contactList" class="max-h-40 overflow-y-auto space-y-2 bg-slate-700/50 p-3 rounded-lg border border-slate-600">
-                    <li class="text-slate-500 italic text-sm">No contacts added in this session yet.</li>
-                </ul>
-            </div>
-        </section>
 
+                <textarea id="messageArea" rows="5" class="w-full p-4 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 placeholder-slate-600 resize-none shadow-inner focus:border-blue-500/50 transition-colors" placeholder="Type your message or paste ciphertext..."></textarea>
+
+                <div class="flex flex-wrap gap-2 justify-between">
+                    <div class="flex gap-2">
+                        <button id="encryptBtn" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 rounded-lg font-bold flex items-center gap-2 transition-all shadow-lg shadow-emerald-900/20 active:scale-95">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Encrypt
+                        </button>
+                        <button id="decryptBtn" class="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 rounded-lg font-bold flex items-center gap-2 transition-all shadow-lg shadow-rose-900/20 active:scale-95">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg> Decrypt
+                        </button>
+                        <button id="copyResultBtn" class="px-5 py-2.5 bg-slate-600 hover:bg-slate-500 rounded-lg font-bold flex items-center gap-2 transition-all shadow-lg active:scale-95">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg> Copy
+                        </button>
+                    </div>
+                    <button id="clearMessageBtn" class="px-5 py-2.5 bg-slate-700/50 hover:bg-slate-700 rounded-lg text-xs font-semibold transition-colors border border-slate-600">Clear</button>
+                </div>
+            </section>
+
+            <section class="pt-6 border-t border-slate-700/50 space-y-4">
+                <h2 class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Contact List</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    <input type="text" id="contactName" class="p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-sm shadow-inner" placeholder="Name">
+                    <input type="text" id="contactPublicKey" class="p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-sm shadow-inner" placeholder="Key">
+                    <button id="addContactBtn" class="bg-indigo-600 hover:bg-indigo-700 p-2.5 rounded-lg font-bold transition-all active:scale-95 shadow-lg shadow-indigo-900/20">Add Contact</button>
+                </div>
+                <ul id="contactList" class="space-y-1 max-h-32 overflow-y-auto pr-1"></ul>
+                
+                <div class="grid grid-cols-2 gap-3 pt-4">
+                    <button id="logoutBtn" class="py-2.5 border border-slate-700 hover:bg-slate-700/40 rounded-lg text-[10px] font-bold text-slate-500 uppercase tracking-widest transition-all">Lock & Logout</button>
+                    <button id="purgeAllBtn" class="py-2.5 bg-rose-600 hover:bg-rose-700 rounded-lg text-[10px] font-bold text-white uppercase tracking-widest transition-all shadow-lg shadow-rose-900/30 active:scale-95">Purge Everything</button>
+                </div>
+            </section>
+        </div>
     </div>
 
     <script>
-        // --- DOM Elements ---
-        const myPublicKeyInput = document.getElementById('myPublicKey');
-        const copyPublicKeyBtn = document.getElementById('copyPublicKeyBtn');
-        const recipientSelect = document.getElementById('recipientSelect');
-        const recipientPublicKeyInput = document.getElementById('recipientPublicKey');
-        const messageArea = document.getElementById('messageArea');
-        const encryptBtn = document.getElementById('encryptBtn');
-        const decryptBtn = document.getElementById('decryptBtn');
-        const copyResultBtn = document.getElementById('copyResultBtn');
-        const clearMessageBtn = document.getElementById('clearMessageBtn');
-        const contactNameInput = document.getElementById('contactName');
-        const contactPublicKeyInput = document.getElementById('contactPublicKey');
-        const addContactBtn = document.getElementById('addContactBtn');
-        const contactListUl = document.getElementById('contactList');
-        const statusMessageDiv = document.getElementById('statusMessage');
+        const DOMAIN = "encryptor.one";
+        let keyPair = null, contacts = {}, masterKey = null, failedAttempts = 0;
+        const encoder = new TextEncoder(), decoder = new TextDecoder();
 
-        // --- Global Variables ---
-        let keyPair = null;
-        let sessionContacts = {};
-
-        // --- Helper Functions ---
-
-        function arrayBufferToBase64(buffer) {
-            let binary = '';
+        // FIX: Safe Base64 conversion that prevents "Maximum call stack size exceeded"
+        const buf2Base64 = (buffer) => {
             const bytes = new Uint8Array(buffer);
-            const len = bytes.byteLength;
-            for (let i = 0; i < len; i++) {
+            let binary = '';
+            for (let i = 0; i < bytes.byteLength; i++) {
                 binary += String.fromCharCode(bytes[i]);
             }
-            return window.btoa(binary);
+            return btoa(binary);
+        };
+        const base642Buf = b => Uint8Array.from(atob(b), c => c.charCodeAt(0)).buffer;
+
+        // FIX: Dynamic Salt & 600k iterations
+        async function deriveMasterKey(pass, salt) {
+            const baseKey = await crypto.subtle.importKey("raw", encoder.encode(pass), "PBKDF2", false, ["deriveKey"]);
+            return crypto.subtle.deriveKey(
+                { name: "PBKDF2", salt, iterations: 600000, hash: "SHA-256" },
+                baseKey, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]
+            );
         }
 
-        function base64ToArrayBuffer(base64) {
+        async function saveState() {
+            if (!masterKey) return;
+            const data = JSON.stringify({
+                privateKey: buf2Base64(await crypto.subtle.exportKey("pkcs8", keyPair.privateKey)),
+                publicKey: buf2Base64(await crypto.subtle.exportKey("spki", keyPair.publicKey)),
+                contacts
+            });
+            const iv = crypto.getRandomValues(new Uint8Array(12));
+            const enc = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, masterKey, encoder.encode(data));
+            localStorage.setItem('vault', buf2Base64(enc));
+            localStorage.setItem('iv', buf2Base64(iv));
+        }
+
+        async function loadState() {
+            const vault = localStorage.getItem('vault'), iv = localStorage.getItem('iv');
+            if (!vault || !iv) return false;
             try {
-                const binary_string = window.atob(base64);
-                const len = binary_string.length;
-                const bytes = new Uint8Array(len);
-                for (let i = 0; i < len; i++) {
-                    bytes[i] = binary_string.charCodeAt(i);
-                }
-                return bytes.buffer;
-            } catch (e) {
-                console.error("Failed to decode base64 string:", e);
-                setStatusMessage('Error decoding base64 string. Is it valid?', 'error');
-                return null;
-            }
-        }
-
-        function setStatusMessage(message, type = 'default') {
-            statusMessageDiv.textContent = message;
-            statusMessageDiv.className = 'text-center p-3 rounded-lg text-sm min-h-[44px] flex items-center justify-center transition-colors duration-300'; // Reset classes
-            switch (type) {
-                case 'success': statusMessageDiv.classList.add('bg-emerald-900/60', 'text-emerald-300'); break;
-                case 'error': statusMessageDiv.classList.add('bg-rose-900/60', 'text-rose-300'); break;
-                case 'info': statusMessageDiv.classList.add('bg-blue-900/60', 'text-blue-300'); break;
-                default: statusMessageDiv.classList.add('italic', 'text-slate-400'); break;
-            }
-        }
-
-        /**
-         * Copies text to the clipboard with improved fallback for mobile.
-         * Tries navigator.clipboard, then document.execCommand, then selects text.
-         * @param {string} text - The text to copy.
-         * @param {string} successMessage - Message to show on successful copy.
-         * @param {HTMLInputElement|HTMLTextAreaElement} [elementToSelectOnFail=null] - The element whose text should be selected if auto-copy fails.
-         */
-        async function copyTextToClipboard(text, successMessage, elementToSelectOnFail = null) {
-            // 1. Try modern Clipboard API (preferred)
-            if (navigator.clipboard && window.isSecureContext) {
-                try {
-                    await navigator.clipboard.writeText(text);
-                    setStatusMessage(successMessage, 'success');
-                    return; // Success!
-                } catch (err) {
-                    console.warn('Clipboard API failed:', err);
-                    // Proceed to fallback
-                }
-            }
-
-            // 2. Try document.execCommand fallback
-            let execCommandSuccess = false;
-            const textArea = document.createElement("textarea");
-            textArea.value = text;
-            textArea.classList.add('visually-hidden');
-            document.body.appendChild(textArea);
-            textArea.focus({ preventScroll: true }); // preventScroll might help on mobile
-            textArea.select();
-            try {
-                execCommandSuccess = document.execCommand('copy');
-                if (execCommandSuccess) {
-                    setStatusMessage(`${successMessage} (using fallback)`, 'success');
-                }
-            } catch (err) {
-                console.warn('document.execCommand copy failed:', err);
-                execCommandSuccess = false; // Ensure it's false
-            } finally {
-                document.body.removeChild(textArea);
-            }
-
-            if (execCommandSuccess) {
-                return; // Success with fallback!
-            }
-
-            // 3. If both failed, try selecting text in the original element (if provided)
-            console.warn('All automatic copy methods failed.');
-            if (elementToSelectOnFail && typeof elementToSelectOnFail.select === 'function') {
-                try {
-                    elementToSelectOnFail.select();
-                    // Some mobile browsers might need this range selection
-                    elementToSelectOnFail.setSelectionRange(0, 99999); // Select all text
-                    setStatusMessage('Auto-copy failed. Text selected. Please copy manually.', 'error');
-                } catch (selectErr) {
-                    console.error('Failed to select text:', selectErr);
-                    setStatusMessage('Copying failed. Please copy manually.', 'error');
-                }
-            } else {
-                // If no element provided (e.g., copying contact key), just show generic error
-                setStatusMessage('Copying failed. Please copy manually.', 'error');
-            }
-        }
-
-
-        // --- Cryptographic Functions ---
-
-        async function generateAndExportKeyPair() {
-            try {
-                keyPair = await window.crypto.subtle.generateKey(
-                    { name: "ECDH", namedCurve: "P-256" }, true, ["deriveKey"]
-                );
-                const exportedPublicKey = await window.crypto.subtle.exportKey("spki", keyPair.publicKey);
-                myPublicKeyInput.value = arrayBufferToBase64(exportedPublicKey);
-                setStatusMessage('New key pair generated successfully!', 'success');
-            } catch (error) {
-                console.error("Key generation failed:", error);
-                setStatusMessage('Error generating key pair. Check browser support.', 'error');
-                myPublicKeyInput.value = 'Error';
-                encryptBtn.disabled = true; decryptBtn.disabled = true; copyPublicKeyBtn.disabled = true;
-            }
-        }
-
-        async function importPublicKey(publicKeyBase64) {
-            const publicKeyBuffer = base64ToArrayBuffer(publicKeyBase64);
-             if (!publicKeyBuffer) return null;
-            try {
-                return await window.crypto.subtle.importKey(
-                    "spki", publicKeyBuffer, { name: "ECDH", namedCurve: "P-256" }, true, []
-                );
-            } catch (error) {
-                console.error("Public key import failed:", error);
-                setStatusMessage('Invalid public key format or curve.', 'error');
-                return null;
-            }
-        }
-
-        async function deriveSharedKey(privateKey, publicKey) {
-             if (!privateKey || !publicKey) {
-                 setStatusMessage('Missing key for derivation.', 'error'); return null;
-             }
-            try {
-                return await window.crypto.subtle.deriveKey(
-                    { name: "ECDH", public: publicKey }, privateKey,
-                    { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]
-                );
-            } catch (error) {
-                console.error("Key derivation failed:", error);
-                setStatusMessage('Failed to derive shared secret. Incompatible keys?', 'error');
-                return null;
-            }
-        }
-
-        async function encryptMessage(sharedKey, plaintext) {
-            if (!sharedKey) return null;
-            try {
-                const iv = window.crypto.getRandomValues(new Uint8Array(12));
-                const encodedPlaintext = new TextEncoder().encode(plaintext);
-                const ciphertextBuffer = await window.crypto.subtle.encrypt(
-                    { name: "AES-GCM", iv: iv }, sharedKey, encodedPlaintext
-                );
-                const ivAndCiphertext = new Uint8Array(iv.length + ciphertextBuffer.byteLength);
-                ivAndCiphertext.set(iv, 0);
-                ivAndCiphertext.set(new Uint8Array(ciphertextBuffer), iv.length);
-                return arrayBufferToBase64(ivAndCiphertext.buffer);
-            } catch (error) {
-                console.error("Encryption failed:", error);
-                setStatusMessage('Encryption failed.', 'error');
-                return null;
-            }
-        }
-
-        async function decryptMessage(sharedKey, ivAndCiphertextBase64) {
-             if (!sharedKey) return null;
-            const ivAndCiphertextBuffer = base64ToArrayBuffer(ivAndCiphertextBase64);
-            if (!ivAndCiphertextBuffer || ivAndCiphertextBuffer.byteLength < 13) {
-                 if (ivAndCiphertextBuffer) setStatusMessage('Invalid ciphertext format (too short).', 'error');
-                 return null;
-            }
-            try {
-                const iv = ivAndCiphertextBuffer.slice(0, 12);
-                const ciphertextBuffer = ivAndCiphertextBuffer.slice(12);
-                const decryptedBuffer = await window.crypto.subtle.decrypt(
-                    { name: "AES-GCM", iv: iv }, sharedKey, ciphertextBuffer
-                );
-                return new TextDecoder().decode(decryptedBuffer);
-            } catch (error) {
-                console.error("Decryption failed:", error);
-                if (error.name === 'OperationError') {
-                     setStatusMessage('Decryption failed: Authentication tag mismatch. Incorrect key or corrupted data.', 'error');
-                } else {
-                     setStatusMessage('Decryption failed. Check console.', 'error');
-                }
-                return null;
-            }
-        }
-
-        // --- Contact Management Functions ---
-
-        function addContact(name, publicKey) {
-            if (!name || !publicKey) {
-                setStatusMessage('Contact name and public key required.', 'error'); return false;
-            }
-            try { window.atob(publicKey); } catch (e) {
-                 setStatusMessage('Invalid public key format (not base64).', 'error'); return false;
-            }
-            sessionContacts[name] = publicKey;
-            return true;
-        }
-
-        function deleteContact(name) {
-            if (sessionContacts[name]) {
-                delete sessionContacts[name];
-                setStatusMessage(`Contact "${name}" deleted for this session.`, 'info');
+                const dec = await crypto.subtle.decrypt({ name: "AES-GCM", iv: base642Buf(iv) }, masterKey, base642Buf(vault));
+                const data = JSON.parse(decoder.decode(dec));
+                keyPair = {
+                    privateKey: await crypto.subtle.importKey("pkcs8", base642Buf(data.privateKey), { name: "ECDH", namedCurve: "P-256" }, true, ["deriveKey"]),
+                    publicKey: await crypto.subtle.importKey("spki", base642Buf(data.publicKey), { name: "ECDH", namedCurve: "P-256" }, true, [])
+                };
+                contacts = data.contacts;
+                document.getElementById('myPublicKey').value = data.publicKey;
                 return true;
-            }
-            return false;
+            } catch (e) { throw new Error("Wrong Password"); }
         }
 
+        async function initApp() {
+            const pass = document.getElementById('masterPassword').value;
+            if (!pass) return;
+
+            try {
+                let savedSalt = localStorage.getItem('salt');
+                let salt;
+                const hasVault = localStorage.getItem('vault') !== null;
+
+                // Load existing salt or generate a new one
+                if (hasVault && savedSalt) {
+                    salt = base642Buf(savedSalt);
+                } else {
+                    salt = crypto.getRandomValues(new Uint8Array(16));
+                }
+
+                masterKey = await deriveMasterKey(pass, salt);
+
+                if (hasVault) {
+                    await loadState(); // Throws if password is wrong
+                } else {
+                    // First time setup
+                    localStorage.setItem('salt', buf2Base64(salt));
+                    keyPair = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveKey"]);
+                    const pub = await crypto.subtle.exportKey("spki", keyPair.publicKey);
+                    document.getElementById('myPublicKey').value = buf2Base64(pub);
+                    await saveState();
+                }
+
+                document.getElementById('authSection').classList.add('hidden-section');
+                document.getElementById('mainSection').classList.remove('hidden-section');
+                renderContacts(); checkDeepLink();
+            } catch (e) {
+                failedAttempts++;
+                const remaining = 3 - failedAttempts;
+                if (remaining <= 0) { 
+                    localStorage.clear(); 
+                    alert("Lokaler Vault gelöscht! Info: Der Zähler ist nur ein UI-Schutz. Wahre Sicherheit bietet nur ein starkes Master-Passwort."); 
+                    location.reload(); 
+                } else { 
+                    const warn = document.getElementById('attemptsWarning');
+                    warn.textContent = `Invalid password! ${remaining} attempts left.`;
+                    warn.classList.replace('text-slate-500', 'text-rose-500');
+                    warn.classList.add('font-bold');
+                }
+            }
+        }
+
+        function checkDeepLink() {
+            const hash = window.location.hash;
+            if (!hash.includes('/add')) return;
+            const params = new URLSearchParams(hash.split('?')[1]);
+            if (params.has('name') && params.has('key')) {
+                const name = decodeURIComponent(params.get('name')), key = decodeURIComponent(params.get('key'));
+                if (confirm(`Add contact "${name}"?`)) {
+                    contacts[name] = key; saveState(); renderContacts(); window.location.hash = "";
+                }
+            }
+        }
+
+        // FIX: Replaced innerHTML with document.createElement to prevent XSS
         function renderContacts() {
-            const contactNames = Object.keys(sessionContacts);
-            const currentSelectedValue = recipientSelect.value;
-            recipientSelect.innerHTML = '<option value="">-- Select Contact --</option>';
-            contactListUl.innerHTML = '';
+            const select = document.getElementById('recipientSelect');
+            const list = document.getElementById('contactList');
+            
+            select.innerHTML = '<option value="">-- Choose --</option>'; 
+            list.innerHTML = "";
 
-            if (contactNames.length === 0) {
-                contactListUl.innerHTML = '<li class="text-slate-500 italic text-sm">No contacts added yet.</li>';
-                 recipientSelect.disabled = true;
-            } else {
-                 recipientSelect.disabled = false;
-                contactNames.sort().forEach(name => {
-                    const option = document.createElement('option');
-                    option.value = name; option.textContent = name;
-                    if (name === currentSelectedValue) option.selected = true;
-                    recipientSelect.appendChild(option);
+            Object.entries(contacts).sort().forEach(([n, k]) => {
+                // Dropdown Option
+                const opt = document.createElement('option'); 
+                opt.value = k; 
+                opt.textContent = n;
+                select.appendChild(opt);
 
-                    const li = document.createElement('li');
-                    li.className = 'flex justify-between items-center p-2 bg-slate-600/50 rounded-lg text-sm hover:bg-slate-600 transition-colors';
-                    li.innerHTML = `
-                        <span class="font-medium truncate mr-2 flex-grow" title="${name}">${name}</span>
-                        <div class="flex items-center space-x-1 flex-shrink-0">
-                             <button class="copy-contact-key-btn p-1.5 text-blue-400 hover:text-blue-300 rounded-md hover:bg-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500" title="Copy ${name}'s Public Key" data-key="${sessionContacts[name]}" data-name="${name}">
-                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-                             </button>
-                             <button class="delete-contact-btn p-1.5 text-rose-400 hover:text-rose-300 rounded-md hover:bg-slate-700 focus:outline-none focus:ring-1 focus:ring-rose-500" title="Delete ${name}" data-name="${name}">
-                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
-                             </button>
-                        </div>`;
-                    contactListUl.appendChild(li);
-                });
-                contactListUl.removeEventListener('click', handleContactListClick);
-                contactListUl.addEventListener('click', handleContactListClick);
+                // List Item
+                const li = document.createElement('li');
+                li.className = "flex justify-between items-center bg-slate-700/20 hover:bg-slate-700/40 p-2 px-3 rounded-lg text-xs group transition-all border border-slate-700/30";
+                
+                const nameSpan = document.createElement('span');
+                nameSpan.className = "font-medium text-slate-300";
+                nameSpan.textContent = n;
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = "text-slate-500 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-all font-bold";
+                deleteBtn.textContent = "Delete";
+                deleteBtn.onclick = () => window.delCon(n);
+
+                li.appendChild(nameSpan);
+                li.appendChild(deleteBtn);
+                list.appendChild(li);
+            });
+        }
+
+        window.delCon = n => { if(confirm(`Delete ${n}?`)) { delete contacts[n]; saveState(); renderContacts(); }};
+
+        function setMsg(m, t) {
+            const s = document.getElementById('statusMessage');
+            s.textContent = m;
+            if(t === 'success') s.className = 'text-center p-3 rounded-lg text-sm min-h-[44px] flex items-center justify-center transition-all bg-emerald-900/40 text-emerald-300 border border-emerald-500/30';
+            else if(t === 'error') s.className = 'text-center p-3 rounded-lg text-sm min-h-[44px] flex items-center justify-center transition-all bg-rose-900/40 text-rose-300 border border-rose-500/30';
+            else s.className = 'text-center p-3 rounded-lg text-sm min-h-[44px] flex items-center justify-center transition-all bg-slate-700/30 text-slate-400 border border-slate-700/50';
+        }
+
+        document.getElementById('unlockBtn').onclick = initApp;
+        document.getElementById('masterPassword').onkeypress = (e) => { if(e.key === 'Enter') initApp(); };
+        
+        document.getElementById('addContactBtn').onclick = () => {
+            const n = document.getElementById('contactName').value.trim(), k = document.getElementById('contactPublicKey').value.trim();
+            if (n && k) { contacts[n] = k; saveState(); renderContacts(); document.getElementById('contactName').value = ""; document.getElementById('contactPublicKey').value = ""; setMsg("Contact added.", "success"); }
+        };
+
+        document.getElementById('shareLinkBtn').onclick = () => {
+            const n = prompt("Enter your display name for the link:", "User");
+            if (!n) return;
+            const link = `https://${DOMAIN}/#/add?name=${encodeURIComponent(n)}&key=${encodeURIComponent(document.getElementById('myPublicKey').value)}`;
+            navigator.clipboard.writeText(link); setMsg("Invite link copied to clipboard!", "success");
+        };
+
+        document.getElementById('copyResultBtn').onclick = () => {
+            navigator.clipboard.writeText(document.getElementById('messageArea').value);
+            setMsg("Copied to clipboard!", "success");
+        };
+
+        document.getElementById('encryptBtn').onclick = async () => {
+            const text = document.getElementById('messageArea').value, kBase = document.getElementById('recipientSelect').value || document.getElementById('recipientPublicKey').value;
+            if (!text || !kBase) return setMsg("Message & Recipient Key required!", "error");
+            try {
+                const pub = await crypto.subtle.importKey("spki", base642Buf(kBase), { name: "ECDH", namedCurve: "P-256" }, true, []);
+                const shared = await crypto.subtle.deriveKey({ name: "ECDH", public: pub }, keyPair.privateKey, { name: "AES-GCM", length: 256 }, false, ["encrypt"]);
+                const iv = crypto.getRandomValues(new Uint8Array(12));
+                const enc = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, shared, encoder.encode(text));
+                const res = new Uint8Array(iv.length + enc.byteLength); res.set(iv, 0); res.set(new Uint8Array(enc), iv.length);
+                document.getElementById('messageArea').value = buf2Base64(res);
+                setMsg("Message encrypted.", "success");
+            } catch (e) { setMsg("Encryption failed.", "error"); }
+        };
+
+        document.getElementById('decryptBtn').onclick = async () => {
+            const cipher = document.getElementById('messageArea').value, kBase = document.getElementById('recipientSelect').value || document.getElementById('recipientPublicKey').value;
+            if (!cipher || !kBase) return setMsg("Ciphertext & Sender Key required!", "error");
+            try {
+                const pub = await crypto.subtle.importKey("spki", base642Buf(kBase), { name: "ECDH", namedCurve: "P-256" }, true, []);
+                const shared = await crypto.subtle.deriveKey({ name: "ECDH", public: pub }, keyPair.privateKey, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+                const d = base642Buf(cipher), iv = d.slice(0, 12), actual = d.slice(12);
+                const dec = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, shared, actual);
+                document.getElementById('messageArea').value = decoder.decode(dec);
+                setMsg("Message decrypted.", "success");
+            } catch (e) { setMsg("Decryption failed (Check key/data).", "error"); }
+        };
+
+        document.getElementById('logoutBtn').onclick = () => location.reload();
+        document.getElementById('clearMessageBtn').onclick = () => { document.getElementById('messageArea').value = ""; setMsg("Ready.", "default"); };
+        document.getElementById('copyPublicKeyBtn').onclick = () => { navigator.clipboard.writeText(document.getElementById('myPublicKey').value); setMsg("Your key copied!", "success"); };
+        
+        document.getElementById('purgeAllBtn').onclick = () => {
+            if(confirm("DANGER: This will permanently delete your keys and all saved contacts. Continue?")) {
+                if(confirm("LAST WARNING: This cannot be undone. Are you sure?")) {
+                    localStorage.clear();
+                    location.reload();
+                }
             }
-        }
-
-        // --- Event Handlers ---
-
-        function handleContactListClick(event) {
-            const targetButton = event.target.closest('button');
-            if (!targetButton) return;
-            if (targetButton.classList.contains('delete-contact-btn')) handleDeleteContact(targetButton);
-            else if (targetButton.classList.contains('copy-contact-key-btn')) handleCopyContactKey(targetButton);
-        }
-
-        function handleCopyPublicKey() {
-            const key = myPublicKeyInput.value;
-            if (!key || key === 'Error' || key === 'Generating...') {
-                setStatusMessage('Public key not available to copy.', 'error'); return;
-            }
-            // Pass the input element for the select-on-fail fallback
-            copyTextToClipboard(key, 'Your public key copied to clipboard!', myPublicKeyInput);
-        }
-
-        function handleCopyResult() {
-             const result = messageArea.value;
-             if (!result) {
-                 setStatusMessage('Nothing to copy from the message area.', 'info'); return;
-             }
-             // Pass the textarea element for the select-on-fail fallback
-            copyTextToClipboard(result, 'Result copied to clipboard!', messageArea);
-        }
-
-        function handleClearMessage() {
-            if (messageArea.value) {
-                messageArea.value = '';
-                setStatusMessage('Message area cleared.', 'info');
-            } else {
-                setStatusMessage('Message area is already empty.', 'info');
-            }
-            messageArea.focus();
-        }
-
-        async function handleEncrypt() {
-            setStatusMessage('Encrypting...', 'info');
-            const plaintext = messageArea.value;
-            if (!plaintext) { setStatusMessage('Please enter text to encrypt.', 'error'); return; }
-            if (!keyPair || !keyPair.privateKey) { setStatusMessage('Your key pair is not ready.', 'error'); return; }
-
-            let recipientPublicKeyBase64 = recipientPublicKeyInput.value.trim();
-            const selectedContactName = recipientSelect.value;
-
-            if (selectedContactName) {
-                recipientPublicKeyBase64 = sessionContacts[selectedContactName];
-                recipientPublicKeyInput.value = '';
-                if (!recipientPublicKeyBase64) { setStatusMessage(`Key for contact "${selectedContactName}" not found.`, 'error'); return; }
-                 setStatusMessage(`Encrypting for contact "${selectedContactName}"...`, 'info');
-            } else if (!recipientPublicKeyBase64) {
-                setStatusMessage('Please select contact or paste recipient key.', 'error'); return;
-            } else {
-                 setStatusMessage('Encrypting using pasted public key...', 'info');
-            }
-
-            const recipientPublicKey = await importPublicKey(recipientPublicKeyBase64); if (!recipientPublicKey) return;
-            const sharedKey = await deriveSharedKey(keyPair.privateKey, recipientPublicKey); if (!sharedKey) return;
-            const ciphertextBase64 = await encryptMessage(sharedKey, plaintext);
-            if (ciphertextBase64) {
-                messageArea.value = ciphertextBase64;
-                setStatusMessage('Message encrypted successfully!', 'success');
-            }
-        }
-
-        async function handleDecrypt() {
-            setStatusMessage('Decrypting...', 'info');
-            const ciphertextBase64 = messageArea.value.trim();
-            if (!ciphertextBase64) { setStatusMessage('Please paste ciphertext to decrypt.', 'error'); return; }
-             if (!keyPair || !keyPair.privateKey) { setStatusMessage('Your key pair is not ready.', 'error'); return; }
-
-            let senderPublicKeyBase64 = recipientPublicKeyInput.value.trim();
-            const selectedContactName = recipientSelect.value;
-            let usedPastedKey = false;
-
-            if (selectedContactName && !senderPublicKeyBase64) {
-                senderPublicKeyBase64 = sessionContacts[selectedContactName];
-                if (!senderPublicKeyBase64) { setStatusMessage(`Key for contact "${selectedContactName}" not found.`, 'error'); return; }
-                 setStatusMessage(`Attempting decryption using "${selectedContactName}"...`, 'info');
-            } else if (senderPublicKeyBase64) {
-                setStatusMessage(`Attempting decryption using pasted key...`, 'info');
-                usedPastedKey = true;
-            } else {
-                 setStatusMessage('Please select sender or paste sender key.', 'error'); return;
-            }
-
-            const senderPublicKey = await importPublicKey(senderPublicKeyBase64); if (!senderPublicKey) return;
-            const sharedKey = await deriveSharedKey(keyPair.privateKey, senderPublicKey); if (!sharedKey) return;
-            const plaintext = await decryptMessage(sharedKey, ciphertextBase64);
-
-            if (plaintext !== null) {
-                messageArea.value = plaintext;
-                setStatusMessage('Message decrypted successfully!', 'success');
-                recipientPublicKeyInput.value = ''; // Always clear input
-                if (usedPastedKey) recipientSelect.value = ''; // Clear select only if pasted key used
-                else recipientSelect.value = selectedContactName; // Keep selected contact
-            }
-            // On failure, status is set in decryptMessage, inputs remain for review
-        }
-
-        function handleAddContact() {
-            const name = contactNameInput.value.trim();
-            const publicKey = contactPublicKeyInput.value.trim();
-            if (addContact(name, publicKey)) {
-                setStatusMessage(`Contact "${name}" added!`, 'success');
-                contactNameInput.value = ''; contactPublicKeyInput.value = '';
-                renderContacts();
-                contactNameInput.focus();
-            }
-        }
-
-        function handleDeleteContact(button) {
-            const name = button.dataset.name;
-            if (name && deleteContact(name)) {
-                 renderContacts();
-            }
-        }
-
-        function handleCopyContactKey(button) {
-             const key = button.dataset.key;
-             const name = button.dataset.name;
-             if (key && name) {
-                 // No element to select on fail for contact keys
-                 copyTextToClipboard(key, `Public key for ${name} copied!`);
-             } else {
-                 console.error("Missing data on contact copy button:", button);
-                 setStatusMessage('Failed to copy contact key.', 'error');
-             }
-        }
-
-        function handleRecipientSelectChange() {
-            if (recipientSelect.value) {
-                recipientPublicKeyInput.value = '';
-                 setStatusMessage(`Selected contact: ${recipientSelect.value}.`, 'default');
-            } else {
-                 setStatusMessage('Contact deselected.', 'default');
-            }
-        }
-
-        function handleRecipientKeyInputChange() {
-             if (recipientPublicKeyInput.value.trim() && recipientSelect.value) {
-                 recipientSelect.value = '';
-                 setStatusMessage('Pasting key. Contact selection cleared.', 'default');
-             }
-        }
-
-        // --- Initialization ---
-        async function initializeApp() {
-             sessionContacts = {}; // Clear session contacts on load
-
-            if (!window.crypto || !window.crypto.subtle) {
-                setStatusMessage('Web Crypto API not supported. Cannot proceed.', 'error');
-                [encryptBtn, decryptBtn, copyPublicKeyBtn, addContactBtn, recipientSelect, recipientPublicKeyInput, messageArea].forEach(el => el.disabled = true);
-                return;
-            }
-
-            await generateAndExportKeyPair();
-            renderContacts();
-
-            // Add Event Listeners
-            copyPublicKeyBtn.addEventListener('click', handleCopyPublicKey);
-            copyResultBtn.addEventListener('click', handleCopyResult);
-            clearMessageBtn.addEventListener('click', handleClearMessage);
-            encryptBtn.addEventListener('click', handleEncrypt);
-            decryptBtn.addEventListener('click', handleDecrypt);
-            addContactBtn.addEventListener('click', handleAddContact);
-            recipientSelect.addEventListener('change', handleRecipientSelectChange);
-            recipientPublicKeyInput.addEventListener('input', handleRecipientKeyInputChange);
-            // Contact list listener is (re)added in renderContacts
-        }
-
-        document.addEventListener('DOMContentLoaded', initializeApp);
-
+        };
     </script>
-
 </body>
 </html>
