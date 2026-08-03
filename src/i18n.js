@@ -1,0 +1,451 @@
+// i18n.js — Deutsch/Englisch. Deutsch ist der Ausgangstext.
+
+import { $$ } from './util.js';
+import { prefs } from './store.js';
+
+const de = {
+  'app.tagline': 'Verschlüsselte Nachrichten für jeden Kanal',
+
+  'nav.encrypt': 'Verschlüsseln',
+  'nav.decrypt': 'Entschlüsseln',
+  'nav.contacts': 'Kontakte',
+  'nav.guide': 'Anleitung',
+
+  'action.copy': 'Kopieren',
+  'action.share': 'Teilen',
+  'action.close': 'Schließen',
+  'action.cancel': 'Abbrechen',
+  'action.delete': 'Löschen',
+  'action.save': 'Speichern',
+  'action.settings': 'Einstellungen',
+  'action.lock': 'Sperren',
+  'action.theme': 'Erscheinung wechseln',
+
+  'landing.eyebrow': 'Kein Konto · Kein Server · Kein Tracking',
+  'landing.title': 'Nachrichten, die nur ihr beide lesen könnt.',
+  'landing.lede': 'encryptor.one verschlüsselt Text direkt in deinem Browser. Den fertigen Block schickst du über WhatsApp, Signal, E-Mail oder Papier — der Weg ist egal, denn unterwegs ist er unlesbar.',
+  'landing.cta.create': 'Identität erstellen',
+  'landing.cta.how': 'So funktioniert’s',
+  'landing.cta.unlock': 'Vault entsperren',
+  'landing.f1.t': 'Der Schlüssel bleibt hier',
+  'landing.f1.d': 'Dein privater Schlüssel wird im Browser erzeugt, mit deiner Passphrase verpackt und verlässt das Gerät nie. Die Seite hat kein Backend, an das sie ihn senden könnte.',
+  'landing.f2.t': 'Jede Nachricht ein neuer Schlüssel',
+  'landing.f2.d': 'Für jede Nachricht entsteht ein frisches, ephemeres Schlüsselpaar. Wird dein Gerät später kompromittiert, sind bereits gesendete Nachrichten davon nicht betroffen.',
+  'landing.f3.t': 'Absender im Umschlag',
+  'landing.f3.d': 'Wer den Chiffretext abfängt, sieht weder Inhalt noch Absender — die Absenderkennung liegt selbst verschlüsselt im Umschlag.',
+  'landing.offline': 'Einmal geladen, funktioniert die App offline. Du kannst die Verbindung trennen und trotzdem weiterarbeiten.',
+
+  'setup.title': 'Identität erstellen',
+  'setup.intro': 'Wir erzeugen jetzt dein Schlüsselpaar. Die Passphrase verschlüsselt den privaten Schlüssel auf diesem Gerät — sie wird nirgendwo gespeichert und nirgendwo übertragen.',
+  'setup.pass': 'Passphrase',
+  'setup.pass.ph': 'Mindestens 12 Zeichen',
+  'setup.pass2': 'Passphrase wiederholen',
+  'setup.generate': 'Vorschlag erzeugen',
+  'setup.copyPass': 'Vorschlag kopieren',
+  'setup.strength': 'Stärke',
+  'setup.s0': 'Zu kurz',
+  'setup.s1': 'Schwach',
+  'setup.s2': 'Brauchbar',
+  'setup.s3': 'Gut',
+  'setup.s4': 'Sehr gut',
+  'setup.nomatch': 'Die beiden Eingaben stimmen nicht überein.',
+  'setup.tooweak': 'Bitte wähle eine längere Passphrase — mindestens 12 Zeichen.',
+  'setup.warn': 'Es gibt keine Wiederherstellung. Ohne diese Passphrase ist dein Schlüssel verloren und Kontakte müssen dich neu hinzufügen. Leg sie in einem Passwortmanager ab und exportiere danach eine Sicherung.',
+  'setup.submit': 'Identität erstellen',
+  'setup.working': 'Schlüssel wird abgeleitet …',
+  'setup.workingHint': 'Das dauert auf dem Handy ein paar Sekunden. Genau das soll es auch — es bremst Angreifer beim Durchprobieren aus.',
+
+  'unlock.title': 'Vault entsperren',
+  'unlock.sub': 'Passphrase eingeben, um den Schlüssel auf diesem Gerät zu entpacken.',
+  'unlock.submit': 'Entsperren',
+  'unlock.wrong': 'Passphrase stimmt nicht.',
+  'unlock.wait': 'Zu viele Versuche. Noch {s} Sekunden warten.',
+  'unlock.forgot': 'Passphrase vergessen?',
+  'unlock.forgotBody': 'Die Passphrase existiert nur in deinem Kopf — sie lässt sich nicht zurücksetzen. Du kannst den Vault löschen und neu anfangen; deine bisherigen Kontakte müssen dich dann mit einem neuen Schlüssel hinzufügen. Hast du eine Sicherung, kannst du sie stattdessen einspielen.',
+  'unlock.reset': 'Vault löschen und neu beginnen',
+  'unlock.restore': 'Sicherung einspielen',
+
+  'enc.to': 'Empfänger',
+  'enc.pickNone': '— Kontakt wählen —',
+  'enc.manual': 'Oder Public Key direkt einfügen',
+  'enc.manual.ph': 'ENCID1.… oder Public Key',
+  'enc.nocontacts': 'Noch keine Kontakte. Füge zuerst den Schlüssel deines Gegenübers hinzu.',
+  'enc.msg': 'Nachricht',
+  'enc.msg.ph': 'Was möchtest du sagen?',
+  'enc.button': 'Verschlüsseln',
+  'enc.result': 'Chiffretext',
+  'enc.hint': 'Diesen Block vollständig kopieren und über einen beliebigen Messenger senden.',
+  'enc.done': 'Verschlüsselt für {name}.',
+  'enc.again': 'Neue Nachricht',
+  'enc.err.recipient': 'Wähle zuerst einen Empfänger.',
+  'enc.err.text': 'Die Nachricht ist leer.',
+  'enc.err.key': 'Dieser Schlüssel ist ungültig.',
+  'enc.fsNote': 'Sobald du dieses Feld leerst, kannst auch du die Nachricht nicht mehr lesen — nur der Empfänger kann sie öffnen.',
+
+  'dec.paste': 'Chiffretext',
+  'dec.paste.ph': 'Empfangenen Block hier einfügen — Zeilenumbrüche und umgebender Text stören nicht.',
+  'dec.button': 'Entschlüsseln',
+  'dec.from': 'Von',
+  'dec.unknown': 'Unbekannter Schlüssel',
+  'dec.unknownHint': 'Dieser Absender ist nicht in deinen Kontakten.',
+  'dec.addsender': 'Absender speichern',
+  'dec.plain': 'Klartext',
+  'dec.sentAt': 'Verfasst am',
+  'dec.dup': 'Diese Nachricht hattest du schon einmal geöffnet.',
+  'dec.again': 'Nächste Nachricht',
+  'dec.err.empty': 'Da ist nichts zum Entschlüsseln.',
+  'dec.err.no_envelope': 'Kein Chiffretext gefunden. Achte darauf, den Block ab „ENC1.“ vollständig zu kopieren.',
+  'dec.err.unknown_version': 'Dieses Format kennt die App nicht. Stammt der Block aus einer neueren Version?',
+  'dec.err.not_for_you': 'Diese Nachricht ist nicht für deinen Schlüssel bestimmt.',
+  'dec.err.tampered': 'Der Chiffretext wurde unterwegs verändert. Verwirf ihn und lass ihn neu senden.',
+  'dec.err.bad_key': 'Der Umschlag ist beschädigt.',
+
+  'con.you': 'Deine Identität',
+  'con.fingerprint': 'Fingerabdruck',
+  'con.copyCard': 'Kontaktkarte kopieren',
+  'con.copyLink': 'Einladungslink kopieren',
+  'con.copyKey': 'Public Key kopieren',
+  'con.list': 'Kontakte',
+  'con.empty': 'Noch niemand hier. Füge den Schlüssel deines Gegenübers hinzu — er darf ruhig öffentlich sein.',
+  'con.add': 'Kontakt hinzufügen',
+  'con.add.input': 'Kontaktkarte, Einladungslink oder Public Key',
+  'con.add.ph': 'ENCID1.… hier einfügen',
+  'con.add.name': 'Name',
+  'con.add.name.ph': 'Wie soll der Kontakt heißen?',
+  'con.add.submit': 'Hinzufügen',
+  'con.add.invalid': 'Darin steckt kein gültiger Schlüssel.',
+  'con.add.exists': 'Diesen Schlüssel hast du bereits als „{name}“ gespeichert.',
+  'con.add.self': 'Das ist dein eigener Schlüssel.',
+  'con.added': '{name} hinzugefügt.',
+  'con.verified': 'Verifiziert',
+  'con.unverified': 'Ungeprüft',
+  'con.verify': 'Fingerabdruck prüfen',
+  'con.verifyBody': 'Lest euch die 20 Zeichen über einen anderen Kanal vor — am Telefon oder von Angesicht zu Angesicht. Stimmen Zeichen und Siegel überein, hat niemand den Schlüsseltausch manipuliert.',
+  'con.verifyConfirm': 'Stimmt überein',
+  'con.unverify': 'Prüfung zurücknehmen',
+  'con.rename': 'Umbenennen',
+  'con.deleteConfirm': '„{name}“ löschen? Der Kontakt kann jederzeit neu hinzugefügt werden.',
+  'con.deleted': 'Kontakt gelöscht.',
+
+  'guide.title': 'In fünf Schritten',
+  'guide.lede': 'encryptor.one ersetzt keinen Messenger — es läuft daneben. Ihr tauscht einmalig Schlüssel aus, danach schickt ihr euch Chiffretext über den Kanal, den ihr ohnehin nutzt.',
+  'guide.s1.t': 'Beide öffnen encryptor.one',
+  'guide.s1.d': 'Jeder legt auf seinem eigenen Gerät eine Identität an. Dabei entsteht ein Schlüsselpaar: der private Teil bleibt auf dem Gerät, der öffentliche darf jeder sehen.',
+  'guide.s2.t': 'Kontaktkarten austauschen',
+  'guide.s2.d': 'Schick deine Kontaktkarte über euren normalen Chat. Sie enthält nur den öffentlichen Schlüssel — hier ist Mitlesen ungefährlich.',
+  'guide.s3.t': 'Fingerabdruck vergleichen',
+  'guide.s3.d': 'Einmal, über einen anderen Kanal: Siegel und 20 Zeichen vergleichen. Das ist der Schritt, der einen untergeschobenen Schlüssel auffliegen lässt.',
+  'guide.s4.t': 'Nachricht verschlüsseln',
+  'guide.s4.d': 'Kontakt wählen, Text tippen, verschlüsseln. Heraus kommt ein Block, der mit „ENC1.“ beginnt.',
+  'guide.s5.t': 'Block senden, Gegenüber entschlüsselt',
+  'guide.s5.d': 'Den Block in euren Chat einfügen und abschicken. Dein Gegenüber fügt ihn hier unter „Entschlüsseln“ ein — fertig.',
+  'guide.prev': 'Zurück',
+  'guide.next': 'Weiter',
+  'guide.step': 'Schritt {n} von 5',
+
+  'sec.title': 'Was das schützt — und was nicht',
+  'sec.does': 'Das leistet die App',
+  'sec.d1': 'Inhalt und Integrität: Niemand auf dem Transportweg kann mitlesen oder unbemerkt etwas ändern — auch der Messenger-Betreiber nicht.',
+  'sec.d2': 'Absender-Echtheit: Nur wer den privaten Schlüssel des Absenders besitzt, kann eine Nachricht erzeugen, die sich entschlüsseln lässt.',
+  'sec.d3': 'Ruhende Daten: Schlüssel und Kontakte liegen mit AES-256-GCM verschlüsselt in diesem Browser.',
+  'sec.doesnt': 'Das leistet sie nicht',
+  'sec.n1': 'Metadaten: Wer wann mit wem schreibt und wie lang die Nachricht ist, sieht der Messenger weiterhin.',
+  'sec.n2': 'Kompromittierte Geräte: Ein Keylogger, eine bösartige Browsererweiterung oder ein entsperrtes Handy in fremden Händen umgehen jede Verschlüsselung.',
+  'sec.n3': 'Vollständige Vorwärtssicherheit: Der ephemere Schlüssel schützt die Senderseite. Wird der langlebige Schlüssel des Empfängers kompromittiert, lassen sich zuvor an ihn gesendete Nachrichten aber entschlüsseln. Dafür bräuchte es ein fortlaufendes Ratchet-Protokoll wie in Signal.',
+  'sec.n4': 'Der Empfänger selbst: Er kann den Klartext kopieren, abfotografieren und weitergeben.',
+  'sec.stack': 'Verfahren: ECDH auf P-256 · HKDF-SHA-256 · AES-256-GCM · PBKDF2-SHA-256 mit 600.000 Runden',
+
+  'set.title': 'Einstellungen',
+  'set.appearance': 'Erscheinung',
+  'set.theme.system': 'System',
+  'set.theme.light': 'Hell',
+  'set.theme.dark': 'Dunkel',
+  'set.lang': 'Sprache',
+  'set.autolock': 'Automatisch sperren',
+  'set.autolock.hint': 'Bei Inaktivität wird der Schlüssel aus dem Speicher entfernt.',
+  'set.autolock.1': 'Nach 1 Minute',
+  'set.autolock.5': 'Nach 5 Minuten',
+  'set.autolock.15': 'Nach 15 Minuten',
+  'set.autolock.60': 'Nach 1 Stunde',
+  'set.autolock.0': 'Nie',
+  'set.backup': 'Sicherung',
+  'set.backup.hint': 'Die Sicherungsdatei ist mit deiner Passphrase verschlüsselt. Sie ist der einzige Weg, deine Identität auf ein anderes Gerät zu bringen oder nach einem verlorenen Browserspeicher weiterzumachen.',
+  'set.backup.export': 'Sicherung exportieren',
+  'set.backup.import': 'Sicherung einspielen',
+  'set.backup.done': 'Sicherung erstellt.',
+  'set.backup.imported': 'Sicherung eingespielt. Bitte mit der Passphrase der Sicherung entsperren.',
+  'set.backup.bad': 'Diese Datei ist keine gültige Sicherung.',
+  'set.backup.wrongpass': 'Passphrase passt nicht zu dieser Sicherung.',
+  'set.backup.overwrite': 'Einspielen ersetzt die Identität auf diesem Gerät. Fortfahren?',
+  'set.pass': 'Passphrase ändern',
+  'set.pass.old': 'Aktuelle Passphrase',
+  'set.pass.new': 'Neue Passphrase',
+  'set.pass.done': 'Passphrase geändert.',
+  'set.danger': 'Alles löschen',
+  'set.danger.hint': 'Entfernt Schlüssel, Kontakte und Einstellungen unwiderruflich aus diesem Browser.',
+  'set.purge': 'Endgültig löschen',
+  'set.purge.confirm': 'Wirklich alles löschen? Ohne Sicherung ist deine Identität danach weg.',
+  'set.lockNow': 'Jetzt sperren',
+  'set.version': 'Version',
+
+  'toast.copied': 'In die Zwischenablage kopiert.',
+  'toast.locked': 'Gesperrt.',
+  'toast.copyFailed': 'Kopieren hat nicht geklappt — bitte den Text manuell markieren.',
+  'toast.update': 'Neue Version verfügbar.',
+  'toast.reload': 'Neu laden',
+  'toast.purged': 'Alles gelöscht.',
+
+  'err.nocrypto': 'Dieser Browser stellt die Web-Crypto-API nicht bereit. Die Seite muss über HTTPS geladen werden und benötigt einen aktuellen Browser.',
+  'err.generic': 'Das hat nicht funktioniert. Bitte noch einmal versuchen.',
+  'err.nostorage': 'Der Browser erlaubt keinen lokalen Speicher. Im privaten Modus oder mit blockierten Cookies kann die App nichts sichern.'
+};
+
+const en = {
+  'app.tagline': 'Encrypted messages for any channel',
+
+  'nav.encrypt': 'Encrypt',
+  'nav.decrypt': 'Decrypt',
+  'nav.contacts': 'Contacts',
+  'nav.guide': 'Guide',
+
+  'action.copy': 'Copy',
+  'action.share': 'Share',
+  'action.close': 'Close',
+  'action.cancel': 'Cancel',
+  'action.delete': 'Delete',
+  'action.save': 'Save',
+  'action.settings': 'Settings',
+  'action.lock': 'Lock',
+  'action.theme': 'Switch appearance',
+
+  'landing.eyebrow': 'No account · No server · No tracking',
+  'landing.title': 'Messages only the two of you can read.',
+  'landing.lede': 'encryptor.one encrypts text right in your browser. Send the finished block over WhatsApp, Signal, email or paper — the route does not matter, because in transit it is unreadable.',
+  'landing.cta.create': 'Create identity',
+  'landing.cta.how': 'How it works',
+  'landing.cta.unlock': 'Unlock vault',
+  'landing.f1.t': 'The key stays here',
+  'landing.f1.d': 'Your private key is generated in the browser, sealed with your passphrase, and never leaves the device. There is no backend to send it to.',
+  'landing.f2.t': 'A fresh key per message',
+  'landing.f2.d': 'Every message gets its own ephemeral key pair. If your device is compromised later, messages you already sent are not affected.',
+  'landing.f3.t': 'Sender inside the envelope',
+  'landing.f3.d': 'Anyone intercepting the ciphertext sees neither the content nor who sent it — the sender identity is itself encrypted.',
+  'landing.offline': 'Once loaded, the app works offline. You can disconnect and keep working.',
+
+  'setup.title': 'Create identity',
+  'setup.intro': 'We will now generate your key pair. The passphrase encrypts the private key on this device — it is never stored and never transmitted.',
+  'setup.pass': 'Passphrase',
+  'setup.pass.ph': 'At least 12 characters',
+  'setup.pass2': 'Repeat passphrase',
+  'setup.generate': 'Suggest one',
+  'setup.copyPass': 'Copy suggestion',
+  'setup.strength': 'Strength',
+  'setup.s0': 'Too short',
+  'setup.s1': 'Weak',
+  'setup.s2': 'Fair',
+  'setup.s3': 'Good',
+  'setup.s4': 'Strong',
+  'setup.nomatch': 'The two entries do not match.',
+  'setup.tooweak': 'Please choose a longer passphrase — at least 12 characters.',
+  'setup.warn': 'There is no recovery. Without this passphrase your key is gone and contacts have to add you again. Store it in a password manager, then export a backup.',
+  'setup.submit': 'Create identity',
+  'setup.working': 'Deriving key …',
+  'setup.workingHint': 'On a phone this takes a few seconds. That is the point — it slows attackers down.',
+
+  'unlock.title': 'Unlock vault',
+  'unlock.sub': 'Enter your passphrase to unseal the key on this device.',
+  'unlock.submit': 'Unlock',
+  'unlock.wrong': 'That passphrase does not match.',
+  'unlock.wait': 'Too many attempts. Wait {s} seconds.',
+  'unlock.forgot': 'Forgot your passphrase?',
+  'unlock.forgotBody': 'The passphrase exists only in your head — it cannot be reset. You can wipe the vault and start over; your contacts will then need to add your new key. If you have a backup, restore it instead.',
+  'unlock.reset': 'Wipe vault and start over',
+  'unlock.restore': 'Restore backup',
+
+  'enc.to': 'Recipient',
+  'enc.pickNone': '— choose a contact —',
+  'enc.manual': 'Or paste a public key',
+  'enc.manual.ph': 'ENCID1.… or public key',
+  'enc.nocontacts': 'No contacts yet. Add the other person’s key first.',
+  'enc.msg': 'Message',
+  'enc.msg.ph': 'What do you want to say?',
+  'enc.button': 'Encrypt',
+  'enc.result': 'Ciphertext',
+  'enc.hint': 'Copy this block in full and send it through any messenger.',
+  'enc.done': 'Encrypted for {name}.',
+  'enc.again': 'New message',
+  'enc.err.recipient': 'Choose a recipient first.',
+  'enc.err.text': 'The message is empty.',
+  'enc.err.key': 'That key is not valid.',
+  'enc.fsNote': 'Once you clear this field, even you can no longer read the message — only the recipient can open it.',
+
+  'dec.paste': 'Ciphertext',
+  'dec.paste.ph': 'Paste the block you received — line breaks and surrounding text are fine.',
+  'dec.button': 'Decrypt',
+  'dec.from': 'From',
+  'dec.unknown': 'Unknown key',
+  'dec.unknownHint': 'This sender is not in your contacts.',
+  'dec.addsender': 'Save sender',
+  'dec.plain': 'Plaintext',
+  'dec.sentAt': 'Written',
+  'dec.dup': 'You have opened this message before.',
+  'dec.again': 'Next message',
+  'dec.err.empty': 'There is nothing to decrypt.',
+  'dec.err.no_envelope': 'No ciphertext found. Make sure you copied the whole block starting at “ENC1.”.',
+  'dec.err.unknown_version': 'This app does not know that format. Is the block from a newer version?',
+  'dec.err.not_for_you': 'This message is not addressed to your key.',
+  'dec.err.tampered': 'The ciphertext was altered in transit. Discard it and ask for a new one.',
+  'dec.err.bad_key': 'The envelope is damaged.',
+
+  'con.you': 'Your identity',
+  'con.fingerprint': 'Fingerprint',
+  'con.copyCard': 'Copy contact card',
+  'con.copyLink': 'Copy invite link',
+  'con.copyKey': 'Copy public key',
+  'con.list': 'Contacts',
+  'con.empty': 'Nobody here yet. Add the other person’s key — it is safe to share publicly.',
+  'con.add': 'Add contact',
+  'con.add.input': 'Contact card, invite link or public key',
+  'con.add.ph': 'Paste ENCID1.… here',
+  'con.add.name': 'Name',
+  'con.add.name.ph': 'What should this contact be called?',
+  'con.add.submit': 'Add',
+  'con.add.invalid': 'No valid key in there.',
+  'con.add.exists': 'You already saved this key as “{name}”.',
+  'con.add.self': 'That is your own key.',
+  'con.added': 'Added {name}.',
+  'con.verified': 'Verified',
+  'con.unverified': 'Unverified',
+  'con.verify': 'Check fingerprint',
+  'con.verifyBody': 'Read the 20 characters to each other over a different channel — by phone or in person. If characters and seal match, nobody tampered with the key exchange.',
+  'con.verifyConfirm': 'They match',
+  'con.unverify': 'Undo verification',
+  'con.rename': 'Rename',
+  'con.deleteConfirm': 'Delete “{name}”? You can add the contact again any time.',
+  'con.deleted': 'Contact deleted.',
+
+  'guide.title': 'Five steps',
+  'guide.lede': 'encryptor.one does not replace your messenger — it runs alongside it. You exchange keys once, then send ciphertext over whatever channel you already use.',
+  'guide.s1.t': 'Both of you open encryptor.one',
+  'guide.s1.d': 'Each person creates an identity on their own device. That produces a key pair: the private half stays on the device, the public half is meant to be seen.',
+  'guide.s2.t': 'Swap contact cards',
+  'guide.s2.d': 'Send your contact card through your normal chat. It holds only the public key — nothing is lost if someone reads it.',
+  'guide.s3.t': 'Compare fingerprints',
+  'guide.s3.d': 'Once, over a different channel: compare the seal and the 20 characters. This is the step that exposes a swapped key.',
+  'guide.s4.t': 'Encrypt a message',
+  'guide.s4.d': 'Pick the contact, type your text, encrypt. Out comes a block starting with “ENC1.”.',
+  'guide.s5.t': 'Send the block, they decrypt',
+  'guide.s5.d': 'Paste the block into your chat and send. The other person pastes it under “Decrypt” here — done.',
+  'guide.prev': 'Back',
+  'guide.next': 'Next',
+  'guide.step': 'Step {n} of 5',
+
+  'sec.title': 'What this protects — and what it does not',
+  'sec.does': 'What it does',
+  'sec.d1': 'Content and integrity: nobody along the route can read along or change anything unnoticed — including the messenger operator.',
+  'sec.d2': 'Sender authenticity: only someone holding the sender’s private key can produce a message that decrypts.',
+  'sec.d3': 'Data at rest: keys and contacts sit in this browser encrypted with AES-256-GCM.',
+  'sec.doesnt': 'What it does not',
+  'sec.n1': 'Metadata: who writes to whom, when, and how long the message is stays visible to the messenger.',
+  'sec.n2': 'Compromised devices: a keylogger, a malicious extension or an unlocked phone in the wrong hands defeats any encryption.',
+  'sec.n3': 'Full forward secrecy: the ephemeral key protects the sender side. If the recipient’s long-term key is compromised, messages previously sent to them can be decrypted. That would need a continuous ratchet protocol like Signal’s.',
+  'sec.n4': 'The recipient: they can copy, photograph and forward the plaintext.',
+  'sec.stack': 'Primitives: ECDH on P-256 · HKDF-SHA-256 · AES-256-GCM · PBKDF2-SHA-256 at 600,000 rounds',
+
+  'set.title': 'Settings',
+  'set.appearance': 'Appearance',
+  'set.theme.system': 'System',
+  'set.theme.light': 'Light',
+  'set.theme.dark': 'Dark',
+  'set.lang': 'Language',
+  'set.autolock': 'Auto-lock',
+  'set.autolock.hint': 'After inactivity the key is removed from memory.',
+  'set.autolock.1': 'After 1 minute',
+  'set.autolock.5': 'After 5 minutes',
+  'set.autolock.15': 'After 15 minutes',
+  'set.autolock.60': 'After 1 hour',
+  'set.autolock.0': 'Never',
+  'set.backup': 'Backup',
+  'set.backup.hint': 'The backup file is encrypted with your passphrase. It is the only way to move your identity to another device or recover after browser storage is lost.',
+  'set.backup.export': 'Export backup',
+  'set.backup.import': 'Restore backup',
+  'set.backup.done': 'Backup created.',
+  'set.backup.imported': 'Backup restored. Unlock with the passphrase of that backup.',
+  'set.backup.bad': 'That file is not a valid backup.',
+  'set.backup.wrongpass': 'Passphrase does not match this backup.',
+  'set.backup.overwrite': 'Restoring replaces the identity on this device. Continue?',
+  'set.pass': 'Change passphrase',
+  'set.pass.old': 'Current passphrase',
+  'set.pass.new': 'New passphrase',
+  'set.pass.done': 'Passphrase changed.',
+  'set.danger': 'Erase everything',
+  'set.danger.hint': 'Irreversibly removes keys, contacts and settings from this browser.',
+  'set.purge': 'Erase permanently',
+  'set.purge.confirm': 'Erase everything? Without a backup your identity is gone.',
+  'set.lockNow': 'Lock now',
+  'set.version': 'Version',
+
+  'toast.copied': 'Copied to clipboard.',
+  'toast.locked': 'Locked.',
+  'toast.copyFailed': 'Copying failed — please select the text manually.',
+  'toast.update': 'A new version is available.',
+  'toast.reload': 'Reload',
+  'toast.purged': 'Everything erased.',
+
+  'err.nocrypto': 'This browser does not provide the Web Crypto API. The page must be served over HTTPS and needs a current browser.',
+  'err.generic': 'That did not work. Please try again.',
+  'err.nostorage': 'The browser does not allow local storage. In private mode or with cookies blocked the app cannot save anything.'
+};
+
+const DICTS = { de, en };
+
+/** 128 kurze, eindeutige Wörter → 7 Bit pro Wort. */
+export const WORDS = (
+  'anker apfel atlas auge bach balken bank baum berg biene birke blatt blau blitz boden bogen ' +
+  'brief bruecke buch dach damm delta dorf drache duene eiche eisen elch ente erde falke faden ' +
+  'feder fels feuer fisch flug fluss forst frost funke gans garten gipfel glas gold hafen halm ' +
+  'hase haus heide himmel hirsch holz honig horn insel kabel kerze kiel klang klee knoten kompass ' +
+  'korb kran kreis lampe leiter licht linde luchs mast meer messer mond moor motte nadel nebel ' +
+  'nest netz nuss ofen otter pfad pfeil pilz platte quelle rabe rad rand reif riff ring ruder ' +
+  'salz sand schilf schnee segel sicht spur stein stern strom sturm tal tanne taube tor turm ' +
+  'ufer uhr vogel wald wand welle wiese wind wolke wurzel zaun zeder zeiger zelt ziegel zirkel zug'
+).split(' ');
+
+let current = 'de';
+
+export function detectLang() {
+  const stored = prefs.get('lang');
+  if (stored === 'de' || stored === 'en') return stored;
+  const nav = (navigator.language || 'en').toLowerCase();
+  return nav.startsWith('de') ? 'de' : 'en';
+}
+
+export function getLang() { return current; }
+
+export function t(key, vars) {
+  let s = (DICTS[current] && DICTS[current][key]) ?? DICTS.de[key] ?? key;
+  if (vars) for (const [k, v] of Object.entries(vars)) s = s.split('{' + k + '}').join(String(v));
+  return s;
+}
+
+const ATTR_MAP = {
+  'i18nPlaceholder': 'placeholder',
+  'i18nTitle': 'title',
+  'i18nLabel': 'aria-label'
+};
+
+export function applyI18n(root = document) {
+  for (const node of $$('[data-i18n]', root)) node.textContent = t(node.dataset.i18n);
+  for (const [dataKey, attr] of Object.entries(ATTR_MAP)) {
+    for (const node of $$(`[data-${dataKey.replace(/[A-Z]/g, (m) => '-' + m.toLowerCase())}]`, root)) {
+      node.setAttribute(attr, t(node.dataset[dataKey]));
+    }
+  }
+}
+
+export function setLang(lang, { persist = true } = {}) {
+  current = DICTS[lang] ? lang : 'de';
+  document.documentElement.lang = current;
+  if (persist) prefs.set('lang', current);
+  applyI18n();
+}

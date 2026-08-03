@@ -1,1 +1,183 @@
-# Encryptor.one
+# encryptor.one
+
+Ende-zu-Ende-Verschlüsselung im Browser. Man erzeugt einmalig eine Identität, tauscht
+Public Keys aus und schickt den Chiffretext danach über einen beliebigen Kanal —
+WhatsApp, Signal, E-Mail, SMS, ein Zettel. Der Betreiber des Kanals sieht nur Buchstabensalat.
+
+Kein Server, kein Konto, keine Telemetrie. Nichts verlässt das Gerät.
+
+---
+
+## Aufbau
+
+Statische Dateien, kein Build-Schritt, keine Laufzeit-Abhängigkeiten. Was im Repo liegt,
+ist exakt das, was im Browser läuft — das ist bei einer Krypto-Anwendung wichtiger als
+jeder Bequemlichkeitsgewinn durch ein Bundling-Werkzeug.
+
+```
+index.html                 Struktur, Icon-Sprite, Dialoge
+assets/styles.css          Design-Tokens, beide Themes, Animationen
+assets/seal.svg            App-Icon
+src/boot.js                Theme + Sprache vor dem ersten Frame (kein Flackern)
+src/app.js                 Oberfläche, Zustand, Abläufe
+src/crypto.js              Krypto-Kern (der Teil, den man prüfen sollte)
+src/store.js               IndexedDB-Vault, Einstellungen
+src/sigil.js               Siegel-Generator
+src/i18n.js                Deutsch / Englisch
+src/util.js                Base64, DOM-Fabrik ohne innerHTML, Animationen
+sw.js                      Offline-Betrieb
+_headers                   Security-Header für Cloudflare Pages
+test/crypto.test.mjs       30 Tests gegen den Krypto-Kern
+```
+
+### Lokal starten
+
+```bash
+npm run serve      # http://localhost:8080
+npm test           # Krypto-Tests, braucht Node 18+
+```
+
+Über `file://` läuft die App nicht: ES-Module und die Web Crypto API brauchen einen
+Secure Context. `localhost` gilt als sicher, ein simpler HTTP-Server genügt also.
+
+---
+
+## Deployment auf Cloudflare Pages
+
+1. Repo zu GitHub pushen.
+2. Cloudflare Dashboard → **Workers & Pages** → **Create** → **Pages** → **Connect to Git**.
+3. Beim Build-Setup:
+   - **Framework preset:** `None`
+   - **Build command:** leer lassen
+   - **Build output directory:** `/`
+4. **Deploy**. Fertig.
+
+`_headers` wird von Pages automatisch ausgewertet und setzt die Security-Header. Nach
+dem ersten Deploy unter *Custom domains* die eigene Domain verbinden.
+
+> **Wichtig:** Build command wirklich leer lassen. Die `package.json` existiert nur für
+> `npm test` und `npm run serve` — sie ist kein Build-Manifest. Wenn Cloudflare
+> versucht, etwas zu bauen, ist die Einstellung falsch.
+
+### Was `_headers` bewirkt
+
+`default-src 'none'` plus `script-src 'self'` heißt: Der Browser lädt ausschließlich
+Code von der eigenen Domain. Kein Inline-Script, kein Inline-Style, kein CDN. Deshalb
+gibt es im gesamten Projekt kein `innerHTML` und keine `style="..."`-Attribute —
+alles läuft über `createElement`/`textContent` und die CSSOM.
+
+`connect-src 'self'` erlaubt nur den Service Worker. Die App macht keine Netzwerkanfragen;
+sollte je eine auftauchen, blockiert der Browser sie. Das ist die eigentliche Zusicherung
+hinter „nichts verlässt das Gerät" — sie hängt nicht davon ab, dass man dem Code glaubt.
+
+---
+
+## Krypto
+
+### Identität
+
+ECDH auf P-256. Der private Schlüssel wird mit AES-KW aus einer Passphrase verpackt
+(PBKDF2-SHA-256, 600 000 Runden, 32 Byte Salt) und liegt nur so in IndexedDB. Nach dem
+Entsperren existiert er als **nicht-exportierbarer** `CryptoKey`: JavaScript kann damit
+rechnen, aber nicht an das Schlüsselmaterial heran — auch nicht bei einem XSS.
+
+Aus der Passphrase werden per HKDF zwei getrennte Schlüssel abgeleitet: einer zum
+Verpacken des privaten Schlüssels, einer für die Kontaktdaten. Beides sind
+unterschiedliche Aufgaben und bekommen deshalb unterschiedliche Schlüssel.
+
+### Nachrichtenumschlag (`ENC1.`)
+
+Pro Nachricht wird ein ephemeres Schlüsselpaar erzeugt:
+
+```
+dh_e = ECDH(eph_priv, empfaenger_pub)     Vorwärtssicherheit senderseitig
+dh_s = ECDH(sender_priv, empfaenger_pub)  implizite Absender-Authentizität
+k    = HKDF-SHA256(dh_e ‖ dh_s, salt, info)
+```
+
+Aus `k` kommen zwei AES-256-GCM-Schlüssel — einer für den Header, einer für den Body.
+Beide Aufrufe binden den kompletten vorangehenden Header als AAD, jedes Bit ist also
+authentifiziert.
+
+`dh_s` liefert Authentizität ohne Signatur. Das ist Absicht: Eine Signatur wäre ein
+Beweis gegenüber Dritten, dass genau diese Person genau diese Nachricht geschrieben hat.
+Über ein geteiltes Geheimnis kann der Empfänger den Absender überprüfen, aber niemandem
+sonst beweisen — dieselbe Eigenschaft, die Signal anstrebt.
+
+**Sealed Sender:** Die Absenderkennung liegt selbst verschlüsselt im Umschlag. Wer den
+Chiffretext abfängt, sieht nicht, von wem er stammt. Nebeneffekt: Der Empfänger muss
+beim Entschlüsseln nichts auswählen — es funktioniert einfach.
+
+```
+Offset  Länge   Feld
+0       2       Magic "E1"
+2       1       Flags
+3       4       Body-Länge (u32BE)
+7       32      Salt
+39      65      Ephemeraler Public Key
+104     12      IV (Header)
+116     81      Absender, verschlüsselt      AAD = bytes[0..116]
+197     12      IV (Body)
+209     n       Body                          AAD = bytes[0..209]
+```
+
+Das Längenfeld macht den Umschlag selbst-begrenzend. Ohne das bricht die Entschlüsselung,
+sobald jemand den Block mitsamt umgebendem Chatverlauf kopiert — der häufigste Fall
+überhaupt. Es steht in beiden AADs und ist damit authentifiziert.
+
+### Fingerabdruck und Siegel
+
+Aus SHA-256 des Public Keys entstehen 100 Bit in Crockford-Base32 (`6C2R-QZE8-…`) und
+zusätzlich ein **Siegel**: ein deterministisch generiertes Emblem. Zwei Schlüssel zu
+vergleichen, indem man zwanzig Zeichen abliest, macht in der Praxis niemand. Zwei Bilder
+zu vergleichen schon.
+
+---
+
+## Was das schützt — und was nicht
+
+**Schützt gegen:** den Messenger-Betreiber, mitlesende Netzwerke, Server-Leaks beim
+Anbieter, jemanden mit Zugriff auf das Gerät ohne die Passphrase.
+
+**Schützt nicht gegen:**
+
+- **Kompromittierte Endgeräte.** Ein Keylogger oder Screenshot-Trojaner sieht den
+  Klartext, bevor er verschlüsselt wird. Dagegen hilft keine Verschlüsselung.
+- **Metadaten.** Dass ihr kommuniziert, wie oft und wie lang die Nachrichten sind,
+  bleibt für den Kanal sichtbar.
+- **Untergeschobene Schlüssel.** Wenn jemand den Schlüsselaustausch manipuliert, redet
+  ihr beide mit dem Angreifer. Deshalb der Fingerabdruck: einmal über einen zweiten
+  Kanal vergleichen — Telefon, persönlich, Videoanruf.
+- **Rückwärtige Vorwärtssicherheit.** Der ephemere Schlüssel schützt den *Absender*:
+  wird sein Gerät später kompromittiert, bleiben gesendete Nachrichten unlesbar. Für den
+  *Empfänger* gilt das nicht — sein Langzeitschlüssel entschlüsselt alles, was er je
+  bekommen hat. Vollständige Vorwärtssicherheit bräuchte einen Double Ratchet, der
+  Zustand über Nachrichten hinweg voraussetzt. Das passt nicht zu einem Werkzeug, das
+  „kopieren, einfügen, fertig" sein soll.
+
+Wer gegen einen Angreifer mit Zugriff auf das Endgerät verteidigen muss, braucht Signal,
+nicht dieses Werkzeug.
+
+---
+
+## Zur Passphrase
+
+Sie ist optional-fähig gebaut, aber standardmäßig an, und das aus gutem Grund: Ohne sie
+liegt der private Schlüssel im Klartext im Browserspeicher — lesbar für jeden mit
+Gerätezugriff, für bösartige Erweiterungen und für Forensik-Werkzeuge.
+
+Der Preis: Passphrase vergessen heißt Identität weg. Es gibt keine Wiederherstellung,
+weil es niemanden gibt, der wiederherstellen könnte. Dagegen hilft der verschlüsselte
+Backup-Export in den Einstellungen — die Sicherung enthält den weiterhin verpackten
+Schlüssel und ist ohne Passphrase nutzlos, kann also gefahrlos in eine Cloud.
+
+Drei Fehlversuche löschen **nichts**. Stattdessen wächst die Wartezeit exponentiell
+(gedeckelt bei zwei Minuten). Automatisches Löschen nach Fehlversuchen klingt nach
+Sicherheit, ist aber vor allem ein Weg, sich selbst auszusperren — und ein Angriffsvektor
+für jeden, der kurz an ein entsperrtes Gerät kommt.
+
+---
+
+## Lizenz
+
+MIT.

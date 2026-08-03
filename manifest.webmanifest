@@ -1,0 +1,17 @@
+{
+  "name": "encryptor.one",
+  "short_name": "encryptor",
+  "description": "Ende-zu-Ende-Verschlüsselung im Browser. Chiffretext für jeden Kanal.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#061420",
+  "theme_color": "#061420",
+  "categories": ["utilities", "security"],
+  "icons": [
+    { "src": "/assets/seal.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/assets/seal-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

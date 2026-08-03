@@ -1,329 +1,638 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="de" data-theme="dark" data-theme-pref="system">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure ECC Messenger | encryptor.one</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-        .backdrop-blur-md { backdrop-filter: blur(12px); }
-        .hidden-section { display: none; }
-        input:focus, textarea:focus, select:focus { outline: none; ring: 2px; ring-color: #3b82f6; }
-        /* Custom scrollbar for better look */
-        textarea::-webkit-scrollbar { width: 6px; }
-        textarea::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>encryptor.one — verschlüsselte Nachrichten für jeden Kanal</title>
+<meta name="description" content="Ende-zu-Ende-Verschlüsselung direkt im Browser. Schlüssel bleiben auf deinem Gerät, der Chiffretext geht über den Messenger deiner Wahl.">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#061420" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#E8EFF5" media="(prefers-color-scheme: light)">
+<link rel="icon" href="/assets/seal.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/assets/seal.svg">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="stylesheet" href="/assets/styles.css">
+<script src="/src/boot.js"></script>
 </head>
-<body class="bg-gradient-to-br from-slate-900 to-slate-800 text-slate-100 min-h-screen p-4 md:p-8 flex items-center justify-center">
+<body>
 
-    <div id="appContainer" class="bg-slate-800/60 backdrop-blur-md border border-slate-700 rounded-xl shadow-2xl p-6 md:p-8 w-full max-w-3xl space-y-6">
-        
-        <header class="text-center space-y-4">
-            <div>
-                <h1 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">Secure ECC Messenger</h1>
-                <p class="text-[10px] text-slate-500 uppercase tracking-[0.3em] mt-1">encryptor.one</p>
-            </div>
-            
-            <div class="max-w-xl mx-auto py-3 px-4 rounded-xl bg-slate-900/30 border border-slate-700/50 shadow-inner">
-                <p class="text-xs text-slate-400 leading-relaxed">
-                    <span class="text-emerald-400/80 font-semibold">Privacy First:</span> 
-                    This tool uses <strong>ECDH (P-256)</strong> for key exchange and <strong>AES-256-GCM</strong> for encryption. 
-                    Everything happens locally in your browser—your private keys are never transmitted or stored elsewhere.
-                </p>
-            </div>
-        </header>
+<svg class="sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <symbol viewBox="0 0 24 24" id="i-seal" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+      <circle cx="12" cy="12" r="9.2"/>
+      <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/>
+      <path d="M12 2.2v2.4M12 19.4v2.4M2.2 12h2.4M19.4 12h2.4M5.1 5.1l1.7 1.7M17.2 17.2l1.7 1.7M18.9 5.1l-1.7 1.7M6.8 17.2l-1.7 1.7"/>
+    </symbol>
+    <symbol viewBox="0 0 24 24" id="i-sun" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+    </symbol>
+    <symbol viewBox="0 0 24 24" id="i-moon" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+    </symbol>
+    <symbol viewBox="0 0 24 24" id="i-monitor" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+    </symbol>
+    <symbol viewBox="0 0 24 24" id="i-gear" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/>
+    </symbol>
+    <symbol viewBox="0 0 24 24" id="i-lock" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>
+    </symbol>
+    <symbol viewBox="0 0 24 24" id="i-unlock" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.9-.9"/>
+    </symbol>
+    <symbol viewBox="0 0 24 24" id="i-copy" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="8" y="8" width="13" height="13" rx="2"/><path d="M5 16a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2"/>
+    </symbol>
+    <symbol viewBox="0 0 24 24" id="i-share" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M16 6l-4-4-4 4M12 2v13"/>
+    </symbol>
+    <symbol viewBox="0 0 24 24" id="i-check" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol viewBox="0 0 24 24" id="i-x" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol viewBox="0 0 24 24" id="i-plus" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol viewBox="0 0 24 24" id="i-trash" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+    </symbol>
+    <symbol viewBox="0 0 24 24" id="i-users" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+    </symbol>
+    <symbol viewBox="0 0 24 24" id="i-compass" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="9.5"/><path d="m16 8-2.2 6.2L7.6 16.4 9.8 10Z"/>
+    </symbol>
+    <symbol viewBox="0 0 24 24" id="i-alert" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 9v4.5M12 17.2h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/>
+    </symbol>
+    <symbol viewBox="0 0 24 24" id="i-download" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+    </symbol>
+    <symbol viewBox="0 0 24 24" id="i-upload" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+    </symbol>
+    <symbol viewBox="0 0 24 24" id="i-pencil" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+    </symbol>
+    <symbol viewBox="0 0 24 24" id="i-eye" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>
+    </symbol>
+    <symbol viewBox="0 0 24 24" id="i-eye-off" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9.9 4.2A9.1 9.1 0 0 1 12 4c6.5 0 10 8 10 8a13.2 13.2 0 0 1-1.7 2.7M6.6 6.6A13.5 13.5 0 0 0 2 12s3.5 8 10 8a9.7 9.7 0 0 0 5.4-1.6M2 2l20 20M14.1 14.1a3 3 0 1 1-4.2-4.2"/>
+    </symbol>
+    <symbol viewBox="0 0 24 24" id="i-chevron-left" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol viewBox="0 0 24 24" id="i-chevron-right" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol viewBox="0 0 24 24" id="i-key" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.8 12.2 21 2M16.5 6.5l3 3L22 7l-3-3"/>
+    </symbol>
+    <symbol viewBox="0 0 24 24" id="i-shield" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/>
+    </symbol>
+    <symbol viewBox="0 0 24 24" id="i-link" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10 13a5 5 0 0 0 7.5.5l3-3A5 5 0 0 0 13.5 3.4l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3A5 5 0 0 0 10.5 20.6l1.7-1.7"/>
+    </symbol>
+    <symbol viewBox="0 0 24 24" id="i-clock" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="9"/><path d="M12 7v5.2l3.4 2"/>
+    </symbol>
+    <symbol viewBox="0 0 24 24" id="i-refresh" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 12a9 9 0 0 1 9-9 9 9 0 0 1 6.4 2.6L21 8M21 3v5h-5M21 12a9 9 0 0 1-9 9 9 9 0 0 1-6.4-2.6L3 16M3 21v-5h5"/>
+    </symbol>
+  </defs>
+</svg>
 
-        <div id="authSection" class="space-y-4 py-10 text-center">
-            <h2 class="text-xl font-semibold">Unlock Vault</h2>
-            <p id="authInstructions" class="text-slate-400 text-sm">Enter your Master Password to access your local keys.</p>
-            <input type="password" id="masterPassword" class="w-full max-w-xs p-3 bg-slate-700 border border-slate-600 rounded-lg text-center shadow-lg" placeholder="Master Password">
-            <div class="flex justify-center gap-3">
-                <button id="unlockBtn" class="px-8 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold transition-all transform active:scale-95 shadow-lg shadow-blue-900/20">Unlock / Setup</button>
-            </div>
-            <p id="attemptsWarning" class="text-[10px] text-slate-500 mt-2 uppercase tracking-widest">3 attempts remaining before local purge</p>
-        </div>
+<a class="skip" href="#main">Zum Inhalt springen</a>
 
-        <div id="mainSection" class="hidden-section space-y-6">
-            
-            <div id="statusMessage" class="text-center p-3 rounded-lg text-sm min-h-[44px] flex items-center justify-center transition-all duration-300 font-medium bg-slate-700/30 text-slate-400 border border-slate-700/50">Ready.</div>
+<header class="topbar">
+  <div class="topbar-inner">
+    <span class="brand">
+      <svg class="brand-mark" aria-hidden="true"><use href="#i-seal"/></svg>
+      <span class="brand-name">encryptor<i>.one</i></span>
+    </span>
+    <div class="topbar-actions">
+      <button type="button" id="btnLang" class="pill-btn" aria-label="Sprache / Language">DE</button>
+      <button type="button" id="btnTheme" class="icon-btn" data-i18n-label="action.theme">
+        <svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg>
+      </button>
+      <button type="button" id="btnLock" class="icon-btn" data-i18n-label="action.lock" hidden>
+        <svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg>
+      </button>
+      <button type="button" id="btnSettings" class="icon-btn" data-i18n-label="action.settings" hidden>
+        <svg class="icon" aria-hidden="true"><use href="#i-gear"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
 
-            <section class="space-y-2">
-                <div class="flex justify-between items-end">
-                    <h2 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Your Identity</h2>
-                    <button id="shareLinkBtn" class="text-[10px] bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/40 px-3 py-1 rounded-full border border-indigo-500/30 flex items-center gap-1.5 transition-all">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-                        Invite Link
-                    </button>
-                </div>
-                <div class="flex items-center space-x-2">
-                    <input type="text" id="myPublicKey" readonly class="flex-grow p-2.5 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-400 text-xs font-mono truncate">
-                    <button id="copyPublicKeyBtn" title="Copy Key" class="p-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors border border-slate-600">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-                    </button>
-                </div>
-            </section>
+<main id="main">
 
-            <section class="space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="space-y-1">
-                        <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Select Contact</label>
-                        <select id="recipientSelect" class="w-full p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-sm shadow-inner">
-                            <option value="">-- Choose --</option>
-                        </select>
-                    </div>
-                    <div class="space-y-1">
-                        <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Manual Key</label>
-                        <input type="text" id="recipientPublicKey" class="w-full p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-sm placeholder-slate-500 shadow-inner" placeholder="Base64...">
-                    </div>
-                </div>
-
-                <textarea id="messageArea" rows="5" class="w-full p-4 bg-slate-900/50 border border-slate-700 rounded-xl text-slate-200 placeholder-slate-600 resize-none shadow-inner focus:border-blue-500/50 transition-colors" placeholder="Type your message or paste ciphertext..."></textarea>
-
-                <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 w-full">
-                    <button id="encryptBtn" class="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 rounded-lg font-bold flex justify-center items-center gap-2 transition-all shadow-lg shadow-emerald-900/20 active:scale-95">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Encrypt
-                    </button>
-                    <button id="decryptBtn" class="w-full sm:w-auto px-4 py-2.5 bg-rose-600 hover:bg-rose-700 rounded-lg font-bold flex justify-center items-center gap-2 transition-all shadow-lg shadow-rose-900/20 active:scale-95">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg> Decrypt
-                    </button>
-                    <button id="copyResultBtn" class="w-full sm:w-auto px-4 py-2.5 bg-slate-600 hover:bg-slate-500 rounded-lg font-bold flex justify-center items-center gap-2 transition-all shadow-lg active:scale-95">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg> Copy
-                    </button>
-                    <button id="clearMessageBtn" class="w-full sm:w-auto sm:ml-auto px-4 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-lg font-bold flex justify-center items-center gap-2 transition-all shadow-lg active:scale-95 border border-slate-600 text-slate-300">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg> Clear
-                    </button>
-                </div>
-            </section>
-
-            <section class="pt-6 border-t border-slate-700/50 space-y-4">
-                <h2 class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Contact List</h2>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
-                    <input type="text" id="contactName" class="p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-sm shadow-inner" placeholder="Name">
-                    <input type="text" id="contactPublicKey" class="p-2.5 bg-slate-700 border border-slate-600 rounded-lg text-sm shadow-inner" placeholder="Key">
-                    <button id="addContactBtn" class="bg-indigo-600 hover:bg-indigo-700 p-2.5 rounded-lg font-bold transition-all active:scale-95 shadow-lg shadow-indigo-900/20">Add Contact</button>
-                </div>
-                <ul id="contactList" class="space-y-1 max-h-32 overflow-y-auto pr-1"></ul>
-                
-                <div class="grid grid-cols-2 gap-3 pt-4">
-                    <button id="logoutBtn" class="py-2.5 border border-slate-700 hover:bg-slate-700/40 rounded-lg text-[10px] font-bold text-slate-500 uppercase tracking-widest transition-all">Lock & Logout</button>
-                    <button id="purgeAllBtn" class="py-2.5 bg-rose-600 hover:bg-rose-700 rounded-lg text-[10px] font-bold text-white uppercase tracking-widest transition-all shadow-lg shadow-rose-900/30 active:scale-95">Purge Everything</button>
-                </div>
-            </section>
-        </div>
+  <!-- ============ LANDING ============ -->
+  <section id="screen-landing" class="screen">
+    <div class="hero">
+      <div class="hero-seal" id="heroSeal" aria-hidden="true"></div>
+      <p class="eyebrow" data-i18n="landing.eyebrow"></p>
+      <h1 class="hero-title" id="heroTitle" data-i18n="landing.title"></h1>
+      <p class="hero-tagline mono" data-i18n="app.tagline"></p>
+      <p class="lede" data-i18n="landing.lede"></p>
+      <div class="hero-actions">
+        <button type="button" id="btnCreate" class="btn btn-primary btn-lg" data-i18n="landing.cta.create"></button>
+        <button type="button" id="btnHow" class="btn btn-quiet btn-lg" data-i18n="landing.cta.how"></button>
+      </div>
+      <p class="hero-note"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-shield"/></svg><span data-i18n="landing.offline"></span></p>
+      <button type="button" id="btnRestoreLanding" class="linklike linklike-quiet" data-i18n="unlock.restore"></button>
     </div>
 
-    <script>
-        const DOMAIN = "encryptor.one";
-        let keyPair = null, contacts = {}, masterKey = null, failedAttempts = 0;
-        const encoder = new TextEncoder(), decoder = new TextDecoder();
+    <div class="facts">
+      <article class="fact">
+        <svg class="icon" aria-hidden="true"><use href="#i-key"/></svg>
+        <h3 data-i18n="landing.f1.t"></h3><p data-i18n="landing.f1.d"></p>
+      </article>
+      <article class="fact">
+        <svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg>
+        <h3 data-i18n="landing.f2.t"></h3><p data-i18n="landing.f2.d"></p>
+      </article>
+      <article class="fact">
+        <svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg>
+        <h3 data-i18n="landing.f3.t"></h3><p data-i18n="landing.f3.d"></p>
+      </article>
+    </div>
 
-        const buf2Base64 = (buffer) => {
-            const bytes = new Uint8Array(buffer);
-            let binary = '';
-            for (let i = 0; i < bytes.byteLength; i++) {
-                binary += String.fromCharCode(bytes[i]);
-            }
-            return btoa(binary);
-        };
-        const base642Buf = b => Uint8Array.from(atob(b), c => c.charCodeAt(0)).buffer;
+    <div id="howtoSlotLanding" class="howto-slot"></div>
 
-        async function deriveMasterKey(pass, salt) {
-            const baseKey = await crypto.subtle.importKey("raw", encoder.encode(pass), "PBKDF2", false, ["deriveKey"]);
-            return crypto.subtle.deriveKey(
-                { name: "PBKDF2", salt, iterations: 600000, hash: "SHA-256" },
-                baseKey, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]
-            );
-        }
+    <div id="securitySlotLanding" class="howto-slot"></div>
+  </section>
 
-        async function saveState() {
-            if (!masterKey) return;
-            const data = JSON.stringify({
-                privateKey: buf2Base64(await crypto.subtle.exportKey("pkcs8", keyPair.privateKey)),
-                publicKey: buf2Base64(await crypto.subtle.exportKey("spki", keyPair.publicKey)),
-                contacts
-            });
-            const iv = crypto.getRandomValues(new Uint8Array(12));
-            const enc = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, masterKey, encoder.encode(data));
-            localStorage.setItem('vault', buf2Base64(enc));
-            localStorage.setItem('iv', buf2Base64(iv));
-        }
+  <!-- ============ UNLOCK ============ -->
+  <section id="screen-lock" class="screen" hidden>
+    <div class="panel panel-narrow lock-panel">
+      <div class="lock-seal" id="lockSeal" aria-hidden="true"></div>
+      <h2 class="panel-title" data-i18n="unlock.title"></h2>
+      <p class="muted" data-i18n="unlock.sub"></p>
+      <form id="unlockForm" class="stack" novalidate>
+        <div class="field">
+          <label class="label" for="unlockPass" data-i18n="setup.pass"></label>
+          <div class="input-affix">
+            <input type="password" id="unlockPass" class="input" autocomplete="current-password"
+                   autocapitalize="off" autocorrect="off" spellcheck="false" data-i18n-placeholder="setup.pass.ph">
+            <button type="button" class="affix-btn" data-toggle-visibility="unlockPass" aria-label="Passphrase anzeigen">
+              <svg class="icon icon-sm" aria-hidden="true"><use href="#i-eye"/></svg>
+            </button>
+          </div>
+        </div>
+        <p class="form-error" id="unlockError" role="alert" hidden></p>
+        <button type="submit" id="unlockSubmit" class="btn btn-primary btn-block" data-i18n="unlock.submit"></button>
+      </form>
+      <div class="lock-links">
+        <button type="button" id="btnRestore" class="linklike" data-i18n="unlock.restore"></button>
+        <button type="button" id="btnForgot" class="linklike linklike-quiet" data-i18n="unlock.forgot"></button>
+      </div>
+    </div>
+  </section>
 
-        async function loadState() {
-            const vault = localStorage.getItem('vault'), iv = localStorage.getItem('iv');
-            if (!vault || !iv) return false;
-            try {
-                const dec = await crypto.subtle.decrypt({ name: "AES-GCM", iv: base642Buf(iv) }, masterKey, base642Buf(vault));
-                const data = JSON.parse(decoder.decode(dec));
-                keyPair = {
-                    privateKey: await crypto.subtle.importKey("pkcs8", base642Buf(data.privateKey), { name: "ECDH", namedCurve: "P-256" }, true, ["deriveKey"]),
-                    publicKey: await crypto.subtle.importKey("spki", base642Buf(data.publicKey), { name: "ECDH", namedCurve: "P-256" }, true, [])
-                };
-                contacts = data.contacts;
-                document.getElementById('myPublicKey').value = data.publicKey;
-                return true;
-            } catch (e) { throw new Error("Wrong Password"); }
-        }
+  <!-- ============ APP ============ -->
+  <section id="screen-app" class="screen" hidden>
 
-        async function initApp() {
-            const pass = document.getElementById('masterPassword').value;
-            if (!pass) return;
+    <nav class="tabs" id="tabs" aria-label="Bereiche">
+      <button type="button" class="tab is-active" data-view="encrypt">
+        <svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg><span data-i18n="nav.encrypt"></span>
+      </button>
+      <button type="button" class="tab" data-view="decrypt">
+        <svg class="icon" aria-hidden="true"><use href="#i-unlock"/></svg><span data-i18n="nav.decrypt"></span>
+      </button>
+      <button type="button" class="tab" data-view="contacts">
+        <svg class="icon" aria-hidden="true"><use href="#i-users"/></svg><span data-i18n="nav.contacts"></span>
+      </button>
+      <button type="button" class="tab" data-view="guide">
+        <svg class="icon" aria-hidden="true"><use href="#i-compass"/></svg><span data-i18n="nav.guide"></span>
+      </button>
+    </nav>
 
-            try {
-                let savedSalt = localStorage.getItem('salt');
-                let salt;
-                const hasVault = localStorage.getItem('vault') !== null;
+    <!-- ---- Verschlüsseln ---- -->
+    <div class="view" id="view-encrypt">
+      <div class="panel">
+        <div class="field">
+          <label class="label" for="recipient" data-i18n="enc.to"></label>
+          <select id="recipient" class="input select"></select>
+          <p class="hint" id="encNoContacts" data-i18n="enc.nocontacts" hidden></p>
+        </div>
+        <details class="disclosure" id="manualKeyBox">
+          <summary data-i18n="enc.manual"></summary>
+          <input type="text" id="manualKey" class="input mono" autocapitalize="off" autocorrect="off"
+                 spellcheck="false" data-i18n-placeholder="enc.manual.ph">
+        </details>
+        <div class="field">
+          <label class="label" for="plainInput" data-i18n="enc.msg"></label>
+          <textarea id="plainInput" class="input textarea" rows="6" data-i18n-placeholder="enc.msg.ph"></textarea>
+          <p class="counter" id="plainCounter">0</p>
+        </div>
+        <button type="button" id="btnEncrypt" class="btn btn-primary btn-block">
+          <svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg><span data-i18n="enc.button"></span>
+        </button>
+        <p class="form-error" id="encError" role="alert" hidden></p>
+      </div>
 
-                if (hasVault && savedSalt) {
-                    salt = base642Buf(savedSalt);
-                } else {
-                    salt = crypto.getRandomValues(new Uint8Array(16));
-                }
+      <div class="panel result-panel" id="encResult" hidden>
+        <div class="result-head">
+          <p class="eyebrow" data-i18n="enc.result"></p>
+          <p class="result-status" id="encStatus"></p>
+        </div>
+        <textarea id="cipherOutput" class="input textarea mono cipher" rows="5" readonly></textarea>
+        <p class="hint" data-i18n="enc.hint"></p>
+        <div class="btn-row">
+          <button type="button" id="btnCopyCipher" class="btn btn-primary">
+            <svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg><span data-i18n="action.copy"></span>
+          </button>
+          <button type="button" id="btnShareCipher" class="btn btn-quiet" hidden>
+            <svg class="icon" aria-hidden="true"><use href="#i-share"/></svg><span data-i18n="action.share"></span>
+          </button>
+          <button type="button" id="btnEncAgain" class="btn btn-quiet" data-i18n="enc.again"></button>
+        </div>
+        <p class="hint subtle"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-alert"/></svg><span data-i18n="enc.fsNote"></span></p>
+      </div>
+    </div>
 
-                masterKey = await deriveMasterKey(pass, salt);
+    <!-- ---- Entschlüsseln ---- -->
+    <div class="view" id="view-decrypt" hidden>
+      <div class="panel">
+        <div class="field">
+          <label class="label" for="cipherInput" data-i18n="dec.paste"></label>
+          <textarea id="cipherInput" class="input textarea mono" rows="6" autocapitalize="off" autocorrect="off"
+                    spellcheck="false" data-i18n-placeholder="dec.paste.ph"></textarea>
+        </div>
+        <button type="button" id="btnDecrypt" class="btn btn-primary btn-block">
+          <svg class="icon" aria-hidden="true"><use href="#i-unlock"/></svg><span data-i18n="dec.button"></span>
+        </button>
+        <p class="form-error" id="decError" role="alert" hidden></p>
+      </div>
 
-                if (hasVault) {
-                    await loadState(); 
-                } else {
-                    localStorage.setItem('salt', buf2Base64(salt));
-                    keyPair = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveKey"]);
-                    const pub = await crypto.subtle.exportKey("spki", keyPair.publicKey);
-                    document.getElementById('myPublicKey').value = buf2Base64(pub);
-                    await saveState();
-                }
+      <div class="panel result-panel" id="decResult" hidden>
+        <p class="eyebrow" data-i18n="dec.from"></p>
+        <div class="sender" id="decSender"></div>
+        <p class="eyebrow" data-i18n="dec.plain"></p>
+        <div class="plain-out" id="plainOutput"></div>
+        <p class="hint" id="decMeta"></p>
+        <div class="btn-row">
+          <button type="button" id="btnCopyPlain" class="btn btn-quiet">
+            <svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg><span data-i18n="action.copy"></span>
+          </button>
+          <button type="button" id="btnDecAgain" class="btn btn-quiet" data-i18n="dec.again"></button>
+        </div>
+      </div>
+    </div>
 
-                document.getElementById('authSection').classList.add('hidden-section');
-                document.getElementById('mainSection').classList.remove('hidden-section');
-                renderContacts(); checkDeepLink();
-            } catch (e) {
-                failedAttempts++;
-                const remaining = 3 - failedAttempts;
-                if (remaining <= 0) { 
-                    localStorage.clear(); 
-                    alert("Lokaler Vault gelöscht! Info: Der Zähler ist nur ein UI-Schutz. Wahre Sicherheit bietet nur ein starkes Master-Passwort."); 
-                    location.reload(); 
-                } else { 
-                    const warn = document.getElementById('attemptsWarning');
-                    warn.textContent = `Invalid password! ${remaining} attempts left.`;
-                    warn.classList.replace('text-slate-500', 'text-rose-500');
-                    warn.classList.add('font-bold');
-                }
-            }
-        }
+    <!-- ---- Kontakte ---- -->
+    <div class="view" id="view-contacts" hidden>
+      <div class="panel identity-panel">
+        <p class="eyebrow" data-i18n="con.you"></p>
+        <div class="identity">
+          <div class="identity-seal" id="mySeal"></div>
+          <div class="identity-body">
+            <p class="label-sm" data-i18n="con.fingerprint"></p>
+            <p class="fingerprint" id="myFingerprint"></p>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button type="button" id="btnCopyCard" class="btn btn-primary">
+            <svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg><span data-i18n="con.copyCard"></span>
+          </button>
+          <button type="button" id="btnShareCard" class="btn btn-quiet" hidden>
+            <svg class="icon" aria-hidden="true"><use href="#i-share"/></svg><span data-i18n="action.share"></span>
+          </button>
+          <button type="button" id="btnCopyLink" class="btn btn-quiet">
+            <svg class="icon" aria-hidden="true"><use href="#i-link"/></svg><span data-i18n="con.copyLink"></span>
+          </button>
+        </div>
+      </div>
 
-        function checkDeepLink() {
-            const hash = window.location.hash;
-            if (!hash.includes('/add')) return;
-            const params = new URLSearchParams(hash.split('?')[1]);
-            if (params.has('name') && params.has('key')) {
-                const name = decodeURIComponent(params.get('name')), key = decodeURIComponent(params.get('key'));
-                if (confirm(`Add contact "${name}"?`)) {
-                    contacts[name] = key; saveState(); renderContacts(); window.location.hash = "";
-                }
-            }
-        }
+      <div class="panel">
+        <div class="panel-head">
+          <p class="eyebrow" data-i18n="con.list"></p>
+          <button type="button" id="btnAddContact" class="btn btn-small btn-primary">
+            <svg class="icon icon-sm" aria-hidden="true"><use href="#i-plus"/></svg><span data-i18n="con.add"></span>
+          </button>
+        </div>
+        <ul class="contact-list" id="contactList"></ul>
+        <p class="empty" id="contactEmpty" data-i18n="con.empty"></p>
+      </div>
+    </div>
 
-        function renderContacts() {
-            const select = document.getElementById('recipientSelect');
-            const list = document.getElementById('contactList');
-            
-            select.innerHTML = '<option value="">-- Choose --</option>'; 
-            list.innerHTML = "";
+    <!-- ---- Anleitung ---- -->
+    <div class="view" id="view-guide" hidden>
+      <div id="howtoSlotApp" class="howto-slot"></div>
+      <div id="securitySlotApp" class="howto-slot"></div>
+    </div>
+  </section>
+</main>
 
-            Object.entries(contacts).sort().forEach(([n, k]) => {
-                const opt = document.createElement('option'); 
-                opt.value = k; 
-                opt.textContent = n;
-                select.appendChild(opt);
+<!-- ============ Bausteine, die zwischen Landing und Tab wandern ============ -->
+<div id="componentStore" hidden>
+<div id="howto" class="panel howto">
+  <p class="eyebrow" data-i18n="guide.title"></p>
+  <p class="lede lede-sm" data-i18n="guide.lede"></p>
 
-                const li = document.createElement('li');
-                li.className = "flex justify-between items-center bg-slate-700/20 hover:bg-slate-700/40 p-2 px-3 rounded-lg text-xs group transition-all border border-slate-700/30";
-                
-                const nameSpan = document.createElement('span');
-                nameSpan.className = "font-medium text-slate-300";
-                nameSpan.textContent = n;
+  <ol class="steps" id="steps">
+    <li class="step is-active" data-step="1">
+      <figure class="scene">
+        <svg viewBox="0 0 320 150" role="img" aria-hidden="true">
+          <g class="sc-devices">
+            <g class="sc-dev sc-dev-a">
+              <rect x="66" y="27" width="60" height="96" rx="11"/>
+              <circle class="sc-seal" cx="96" cy="75" r="17"/>
+              <circle class="sc-core" cx="96" cy="75" r="3"/>
+            </g>
+            <g class="sc-dev sc-dev-b">
+              <rect x="194" y="27" width="60" height="96" rx="11"/>
+              <circle class="sc-seal" cx="224" cy="75" r="17"/>
+              <circle class="sc-core" cx="224" cy="75" r="3"/>
+            </g>
+          </g>
+          <path class="sc-dash" d="M136 75h48"/>
+        </svg>
+      </figure>
+      <div class="step-body">
+        <p class="step-index" data-step-index="1"></p>
+        <h3 data-i18n="guide.s1.t"></h3>
+        <p data-i18n="guide.s1.d"></p>
+      </div>
+    </li>
 
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = "text-slate-500 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-all font-bold";
-                deleteBtn.textContent = "Delete";
-                deleteBtn.onclick = () => window.delCon(n);
+    <li class="step" data-step="2">
+      <figure class="scene">
+        <svg viewBox="0 0 320 150" role="img" aria-hidden="true">
+          <rect class="sc-dev-plain" x="26" y="35" width="52" height="80" rx="10"/>
+          <rect class="sc-dev-plain" x="242" y="35" width="52" height="80" rx="10"/>
+          <path class="sc-dash" d="M84 75h152"/>
+          <g class="sc-travel">
+            <rect class="sc-card" x="-32" y="-15" width="64" height="30" rx="7"/>
+            <path class="sc-card-line" d="M-20 -4h40M-20 4h24"/>
+          </g>
+        </svg>
+      </figure>
+      <div class="step-body">
+        <p class="step-index" data-step-index="2"></p>
+        <h3 data-i18n="guide.s2.t"></h3>
+        <p data-i18n="guide.s2.d"></p>
+      </div>
+    </li>
 
-                li.appendChild(nameSpan);
-                li.appendChild(deleteBtn);
-                list.appendChild(li);
-            });
-        }
+    <li class="step" data-step="3">
+      <figure class="scene">
+        <svg viewBox="0 0 320 150" role="img" aria-hidden="true">
+          <g class="sc-cmp sc-cmp-a">
+            <circle class="sc-seal" cx="96" cy="70" r="30"/>
+            <circle class="sc-core" cx="96" cy="70" r="4"/>
+            <path class="sc-fp" d="M76 108h40"/>
+          </g>
+          <g class="sc-cmp sc-cmp-b">
+            <circle class="sc-seal" cx="224" cy="70" r="30"/>
+            <circle class="sc-core" cx="224" cy="70" r="4"/>
+            <path class="sc-fp" d="M204 108h40"/>
+          </g>
+          <path class="sc-check" d="M146 70l10 11 18-22"/>
+        </svg>
+      </figure>
+      <div class="step-body">
+        <p class="step-index" data-step-index="3"></p>
+        <h3 data-i18n="guide.s3.t"></h3>
+        <p data-i18n="guide.s3.d"></p>
+      </div>
+    </li>
 
-        window.delCon = n => { if(confirm(`Delete ${n}?`)) { delete contacts[n]; saveState(); renderContacts(); }};
+    <li class="step" data-step="4">
+      <figure class="scene">
+        <svg viewBox="0 0 320 150" role="img" aria-hidden="true">
+          <g class="sc-plain">
+            <path d="M40 52h84M40 66h68M40 80h78M40 94h52"/>
+          </g>
+          <g class="sc-lockmark">
+            <rect x="146" y="60" width="28" height="20" rx="4"/>
+            <path class="sc-shackle" d="M153 60v-6a7 7 0 0 1 14 0v6"/>
+          </g>
+          <g class="sc-cipher">
+            <path d="M196 52h84M196 66h84M196 80h84M196 94h60"/>
+          </g>
+        </svg>
+      </figure>
+      <div class="step-body">
+        <p class="step-index" data-step-index="4"></p>
+        <h3 data-i18n="guide.s4.t"></h3>
+        <p data-i18n="guide.s4.d"></p>
+      </div>
+    </li>
 
-        function setMsg(m, t) {
-            const s = document.getElementById('statusMessage');
-            s.textContent = m;
-            if(t === 'success') s.className = 'text-center p-3 rounded-lg text-sm min-h-[44px] flex items-center justify-center transition-all bg-emerald-900/40 text-emerald-300 border border-emerald-500/30';
-            else if(t === 'error') s.className = 'text-center p-3 rounded-lg text-sm min-h-[44px] flex items-center justify-center transition-all bg-rose-900/40 text-rose-300 border border-rose-500/30';
-            else s.className = 'text-center p-3 rounded-lg text-sm min-h-[44px] flex items-center justify-center transition-all bg-slate-700/30 text-slate-400 border border-slate-700/50';
-        }
+    <li class="step" data-step="5">
+      <figure class="scene">
+        <svg viewBox="0 0 320 150" role="img" aria-hidden="true">
+          <rect class="sc-dev-plain" x="26" y="35" width="52" height="80" rx="10"/>
+          <rect class="sc-dev-plain" x="242" y="35" width="52" height="80" rx="10"/>
+          <g class="sc-bubble">
+            <rect x="-40" y="-17" width="80" height="34" rx="10"/>
+            <path class="sc-noise" d="M-28 -5h56M-28 5h34"/>
+          </g>
+          <g class="sc-reveal">
+            <path d="M252 62h32M252 74h32M252 86h20"/>
+          </g>
+        </svg>
+      </figure>
+      <div class="step-body">
+        <p class="step-index" data-step-index="5"></p>
+        <h3 data-i18n="guide.s5.t"></h3>
+        <p data-i18n="guide.s5.d"></p>
+      </div>
+    </li>
+  </ol>
 
-        document.getElementById('unlockBtn').onclick = initApp;
-        document.getElementById('masterPassword').onkeypress = (e) => { if(e.key === 'Enter') initApp(); };
-        
-        document.getElementById('addContactBtn').onclick = () => {
-            const n = document.getElementById('contactName').value.trim(), k = document.getElementById('contactPublicKey').value.trim();
-            if (n && k) { contacts[n] = k; saveState(); renderContacts(); document.getElementById('contactName').value = ""; document.getElementById('contactPublicKey').value = ""; setMsg("Contact added.", "success"); }
-        };
+  <div class="steps-nav">
+    <button type="button" id="stepPrev" class="icon-btn" data-i18n-label="guide.prev">
+      <svg class="icon" aria-hidden="true"><use href="#i-chevron-left"/></svg>
+    </button>
+    <div class="dots" id="stepDots" role="tablist"></div>
+    <button type="button" id="stepNext" class="icon-btn" data-i18n-label="guide.next">
+      <svg class="icon" aria-hidden="true"><use href="#i-chevron-right"/></svg>
+    </button>
+  </div>
+</div>
 
-        document.getElementById('shareLinkBtn').onclick = () => {
-            const n = prompt("Enter your display name for the link:", "User");
-            if (!n) return;
-            const link = `https://${DOMAIN}/#/add?name=${encodeURIComponent(n)}&key=${encodeURIComponent(document.getElementById('myPublicKey').value)}`;
-            navigator.clipboard.writeText(link); setMsg("Invite link copied to clipboard!", "success");
-        };
+<!-- ============ Sicherheitshinweise ============ -->
+<div id="securityNote" class="panel security">
+  <p class="eyebrow" data-i18n="sec.title"></p>
+  <div class="sec-grid">
+    <div>
+      <h3 class="sec-h sec-yes"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-check"/></svg><span data-i18n="sec.does"></span></h3>
+      <ul class="sec-list">
+        <li data-i18n="sec.d1"></li><li data-i18n="sec.d2"></li><li data-i18n="sec.d3"></li>
+      </ul>
+    </div>
+    <div>
+      <h3 class="sec-h sec-no"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-alert"/></svg><span data-i18n="sec.doesnt"></span></h3>
+      <ul class="sec-list">
+        <li data-i18n="sec.n1"></li><li data-i18n="sec.n2"></li><li data-i18n="sec.n3"></li><li data-i18n="sec.n4"></li>
+      </ul>
+    </div>
+  </div>
+  <p class="stack-line mono" data-i18n="sec.stack"></p>
+</div>
 
-        document.getElementById('copyResultBtn').onclick = () => {
-            navigator.clipboard.writeText(document.getElementById('messageArea').value);
-            setMsg("Copied to clipboard!", "success");
-        };
+</div><!-- /componentStore -->
 
-        document.getElementById('encryptBtn').onclick = async () => {
-            const text = document.getElementById('messageArea').value, kBase = document.getElementById('recipientSelect').value || document.getElementById('recipientPublicKey').value;
-            if (!text || !kBase) return setMsg("Message & Recipient Key required!", "error");
-            try {
-                const pub = await crypto.subtle.importKey("spki", base642Buf(kBase), { name: "ECDH", namedCurve: "P-256" }, true, []);
-                const shared = await crypto.subtle.deriveKey({ name: "ECDH", public: pub }, keyPair.privateKey, { name: "AES-GCM", length: 256 }, false, ["encrypt"]);
-                const iv = crypto.getRandomValues(new Uint8Array(12));
-                const enc = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, shared, encoder.encode(text));
-                const res = new Uint8Array(iv.length + enc.byteLength); res.set(iv, 0); res.set(new Uint8Array(enc), iv.length);
-                document.getElementById('messageArea').value = buf2Base64(res);
-                setMsg("Message encrypted.", "success");
-            } catch (e) { setMsg("Encryption failed.", "error"); }
-        };
+<!-- ============ Dialoge ============ -->
 
-        document.getElementById('decryptBtn').onclick = async () => {
-            const cipher = document.getElementById('messageArea').value, kBase = document.getElementById('recipientSelect').value || document.getElementById('recipientPublicKey').value;
-            if (!cipher || !kBase) return setMsg("Ciphertext & Sender Key required!", "error");
-            try {
-                const pub = await crypto.subtle.importKey("spki", base642Buf(kBase), { name: "ECDH", namedCurve: "P-256" }, true, []);
-                const shared = await crypto.subtle.deriveKey({ name: "ECDH", public: pub }, keyPair.privateKey, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
-                const d = base642Buf(cipher), iv = d.slice(0, 12), actual = d.slice(12);
-                const dec = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, shared, actual);
-                document.getElementById('messageArea').value = decoder.decode(dec);
-                setMsg("Message decrypted.", "success");
-            } catch (e) { setMsg("Decryption failed (Check key/data).", "error"); }
-        };
+<dialog id="dlgSetup" class="sheet">
+  <div class="sheet-head">
+    <h2 data-i18n="setup.title"></h2>
+    <button type="button" class="icon-btn" data-close data-i18n-label="action.close"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
+  </div>
+  <form id="setupForm" class="sheet-body stack" novalidate>
+    <p class="muted" data-i18n="setup.intro"></p>
+    <div class="field">
+      <label class="label" for="setupPass" data-i18n="setup.pass"></label>
+      <div class="input-affix">
+        <input type="password" id="setupPass" class="input" autocomplete="new-password" autocapitalize="off"
+               autocorrect="off" spellcheck="false" data-i18n-placeholder="setup.pass.ph">
+        <button type="button" class="affix-btn" data-toggle-visibility="setupPass" aria-label="Passphrase anzeigen">
+          <svg class="icon icon-sm" aria-hidden="true"><use href="#i-eye"/></svg>
+        </button>
+      </div>
+      <div class="meter"><div class="meter-bar" id="passMeter"></div></div>
+      <p class="hint" id="passStrength"></p>
+      <div class="btn-row btn-row-tight">
+        <button type="button" id="btnSuggestPass" class="linklike" data-i18n="setup.generate"></button>
+        <button type="button" id="btnCopyPass" class="linklike" data-i18n="setup.copyPass" hidden></button>
+      </div>
+    </div>
+    <div class="field">
+      <label class="label" for="setupPass2" data-i18n="setup.pass2"></label>
+      <input type="password" id="setupPass2" class="input" autocomplete="new-password" autocapitalize="off"
+             autocorrect="off" spellcheck="false">
+    </div>
+    <p class="callout callout-warn"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-alert"/></svg><span data-i18n="setup.warn"></span></p>
+    <p class="hint subtle"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-clock"/></svg><span data-i18n="setup.workingHint"></span></p>
+    <p class="form-error" id="setupError" role="alert" hidden></p>
+    <button type="submit" id="setupSubmit" class="btn btn-primary btn-block" data-i18n="setup.submit"></button>
+  </form>
+</dialog>
 
-        document.getElementById('logoutBtn').onclick = () => location.reload();
-        document.getElementById('clearMessageBtn').onclick = () => { document.getElementById('messageArea').value = ""; setMsg("Ready.", "default"); };
-        document.getElementById('copyPublicKeyBtn').onclick = () => { navigator.clipboard.writeText(document.getElementById('myPublicKey').value); setMsg("Your key copied!", "success"); };
-        
-        document.getElementById('purgeAllBtn').onclick = () => {
-            if(confirm("DANGER: This will permanently delete your keys and all saved contacts. Continue?")) {
-                if(confirm("LAST WARNING: This cannot be undone. Are you sure?")) {
-                    localStorage.clear();
-                    location.reload();
-                }
-            }
-        };
-    </script>
+<dialog id="dlgContact" class="sheet">
+  <div class="sheet-head">
+    <h2 data-i18n="con.add"></h2>
+    <button type="button" class="icon-btn" data-close data-i18n-label="action.close"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
+  </div>
+  <form id="contactForm" class="sheet-body stack" novalidate>
+    <div class="field">
+      <label class="label" for="contactInput" data-i18n="con.add.input"></label>
+      <textarea id="contactInput" class="input textarea mono" rows="3" autocapitalize="off" autocorrect="off"
+                spellcheck="false" data-i18n-placeholder="con.add.ph"></textarea>
+    </div>
+    <div class="preview" id="contactPreview" hidden></div>
+    <div class="field">
+      <label class="label" for="contactName" data-i18n="con.add.name"></label>
+      <input type="text" id="contactName" class="input" maxlength="64" data-i18n-placeholder="con.add.name.ph">
+    </div>
+    <p class="form-error" id="contactError" role="alert" hidden></p>
+    <button type="submit" class="btn btn-primary btn-block" data-i18n="con.add.submit"></button>
+  </form>
+</dialog>
+
+<dialog id="dlgDetail" class="sheet">
+  <div class="sheet-head">
+    <h2 id="detailTitle"></h2>
+    <button type="button" class="icon-btn" data-close data-i18n-label="action.close"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
+  </div>
+  <div class="sheet-body stack" id="detailBody"></div>
+</dialog>
+
+<dialog id="dlgSettings" class="sheet">
+  <div class="sheet-head">
+    <h2 data-i18n="set.title"></h2>
+    <button type="button" class="icon-btn" data-close data-i18n-label="action.close"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
+  </div>
+  <div class="sheet-body stack">
+    <section class="setting">
+      <p class="label" data-i18n="set.appearance"></p>
+      <div class="segmented" id="themeSeg" role="group">
+        <button type="button" data-theme-val="system" data-i18n="set.theme.system"></button>
+        <button type="button" data-theme-val="light" data-i18n="set.theme.light"></button>
+        <button type="button" data-theme-val="dark" data-i18n="set.theme.dark"></button>
+      </div>
+    </section>
+    <section class="setting">
+      <p class="label" data-i18n="set.lang"></p>
+      <div class="segmented" id="langSeg" role="group">
+        <button type="button" data-lang-val="de">Deutsch</button>
+        <button type="button" data-lang-val="en">English</button>
+      </div>
+    </section>
+    <section class="setting">
+      <label class="label" for="autolockSel" data-i18n="set.autolock"></label>
+      <select id="autolockSel" class="input select">
+        <option value="1" data-i18n="set.autolock.1"></option>
+        <option value="5" data-i18n="set.autolock.5"></option>
+        <option value="15" data-i18n="set.autolock.15"></option>
+        <option value="60" data-i18n="set.autolock.60"></option>
+        <option value="0" data-i18n="set.autolock.0"></option>
+      </select>
+      <p class="hint" data-i18n="set.autolock.hint"></p>
+    </section>
+    <hr class="rule">
+    <section class="setting">
+      <p class="label" data-i18n="set.backup"></p>
+      <p class="hint" data-i18n="set.backup.hint"></p>
+      <div class="btn-row">
+        <button type="button" id="btnExport" class="btn btn-quiet">
+          <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg><span data-i18n="set.backup.export"></span>
+        </button>
+        <button type="button" id="btnImport" class="btn btn-quiet">
+          <svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg><span data-i18n="set.backup.import"></span>
+        </button>
+      </div>
+      <textarea id="backupOut" class="input textarea mono cipher" rows="4" readonly hidden></textarea>
+    </section>
+    <hr class="rule">
+    <section class="setting">
+      <p class="label" data-i18n="set.pass"></p>
+      <form id="passForm" class="stack" novalidate>
+        <input type="password" id="passOld" class="input" autocomplete="current-password" autocapitalize="off"
+               spellcheck="false" data-i18n-placeholder="set.pass.old">
+        <input type="password" id="passNew" class="input" autocomplete="new-password" autocapitalize="off"
+               spellcheck="false" data-i18n-placeholder="set.pass.new">
+        <p class="form-error" id="passError" role="alert" hidden></p>
+        <button type="submit" class="btn btn-quiet btn-block" data-i18n="set.pass"></button>
+      </form>
+    </section>
+    <hr class="rule">
+    <section class="setting">
+      <button type="button" id="btnLockNow" class="btn btn-quiet btn-block">
+        <svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg><span data-i18n="set.lockNow"></span>
+      </button>
+    </section>
+    <section class="setting">
+      <p class="version-row"><span data-i18n="set.version"></span> <span class="mono" id="appVersion"></span></p>
+    </section>
+    <hr class="rule">
+    <section class="setting danger">
+      <p class="label" data-i18n="set.danger"></p>
+      <p class="hint" data-i18n="set.danger.hint"></p>
+      <button type="button" id="btnPurge" class="btn btn-danger btn-block">
+        <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg><span data-i18n="set.purge"></span>
+      </button>
+    </section>
+    <p class="version mono" id="versionLine"></p>
+  </div>
+</dialog>
+
+<dialog id="dlgConfirm" class="sheet sheet-compact">
+  <div class="sheet-body stack">
+    <h2 id="confirmTitle"></h2>
+    <p class="muted" id="confirmBody"></p>
+    <div class="btn-row btn-row-end">
+      <button type="button" id="confirmCancel" class="btn btn-quiet" data-i18n="action.cancel"></button>
+      <button type="button" id="confirmOk" class="btn btn-danger"></button>
+    </div>
+  </div>
+</dialog>
+
+<input type="file" id="importFile" accept="application/json,.json" hidden>
+
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+<script type="module" src="/src/app.js"></script>
 </body>
 </html>

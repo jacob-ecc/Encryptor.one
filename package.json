@@ -1,0 +1,11 @@
+{
+  "name": "encryptor-one",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Ende-zu-Ende-Verschlüsselung im Browser. Kein Build-Schritt, keine Abhängigkeiten.",
+  "scripts": {
+    "test": "node test/crypto.test.mjs",
+    "serve": "python3 -m http.server 8080"
+  }
+}
