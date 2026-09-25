@@ -52,6 +52,17 @@ export function wipe(...arrays) {
   for (const a of arrays) { if (a && a.fill) a.fill(0); }
 }
 
+/**
+ * Anzeigename aus fremder Quelle: ohne Steuer- und Richtungszeichen (U+202E & Co.),
+ * mit denen sich ein Name in der Oberflaeche anders darstellen liesse, als er ist.
+ */
+export function cleanName(name) {
+  return String(name || '')
+    .replace(/[\u0000-\u001f\u007f-\u009f\u061c\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g, '')
+    .trim()
+    .slice(0, 64);
+}
+
 /* ---------- DOM ---------- */
 
 export function $(sel, root = document) { return root.querySelector(sel); }

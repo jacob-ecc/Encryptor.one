@@ -29,8 +29,18 @@
 // body_len steht in beiden AADs und ist damit authentifiziert. Es erlaubt dem
 // Parser, den Block exakt abzuschneiden — nur so ueberlebt ein Chiffretext das
 // Einfuegen mitten in einen Chatverlauf.
+//
+// Payload (JSON, im Body):
+//   v   Version (1)
+//   t   Zeitstempel des Absenders
+//   m   Text
+//   rk  optional: neuer Public Key des Absenders (Schluesselwechsel). Authentifiziert
+//       durch dh_s mit dem bisherigen Schluessel — nur dessen Besitzer kann ihn setzen.
+//   p   Fuellzeichen. Die Laenge landet auf festen Stufen (mind. 256 Byte, darueber
+//       Padme), damit der Chiffretext nicht die exakte Textlaenge verraet.
+// Aeltere Versionen ignorieren rk und p, das Format bleibt kompatibel.
 
-import { enc, dec, concat, b64urlEncode, b64urlDecode, wipe } from './util.js';
+import { enc, dec, concat, b64urlEncode, b64urlDecode, wipe, cleanName } from './util.js';
 
 const subtle = globalThis.crypto && globalThis.crypto.subtle;
 export const CRYPTO_AVAILABLE = !!(subtle && globalThis.isSecureContext !== false);
@@ -41,6 +51,9 @@ const OFF = { len: 3, salt: 7, eph: 39, iv0: 104, sealed: 116, iv1: 197, body: 2
 const HDR_AAD_LEN = 116;
 const FULL_HDR_LEN = 209;
 const MAX_BODY = 4_000_000;
+const MIN_PAYLOAD = 256;
+const HDR_INFO = enc.encode('encryptor.one/v1/hdr');
+const BODY_INFO = enc.encode('encryptor.one/v1/body');
 
 export const KDF_ITERATIONS = 600_000;
 export const MSG_PREFIX = 'ENC1.';
@@ -70,6 +83,21 @@ export async function sha256(bytes) {
 }
 
 export function randomBytes(n) { return crypto.getRandomValues(new Uint8Array(n)); }
+
+/** Gleichverteilte Zahl in [0, n) — Rejection Sampling statt Modulo, also ohne Bias. */
+export function randomInt(n) {
+  const limit = Math.floor(0x100000000 / n) * n;
+  const buf = new Uint32Array(1);
+  do crypto.getRandomValues(buf); while (buf[0] >= limit);
+  return buf[0] % n;
+}
+
+function equalBytes(a, b) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  return diff === 0;
+}
 
 /* ---------------- Schlüssel ---------------- */
 
@@ -102,6 +130,26 @@ export async function unwrapIdentity(wrapKey, wrapped, iv, extractable = false) 
   );
 }
 
+/**
+ * Prueft, ob privater und oeffentlicher Schluessel zusammengehoeren: ein Probe-Schluessel
+ * rechnet ECDH einmal mit jeder Haelfte. Der Public Key liegt unverschluesselt im Vault
+ * und in der Sicherung — ohne diese Pruefung koennte jemand ihn austauschen, und die App
+ * wuerde fortan einen fremden Schluessel als eigene Identitaet weitergeben.
+ */
+export async function keyPairMatches(privateKey, publicKeyRaw) {
+  try {
+    const pub = await importPublicRaw(publicKeyRaw);
+    const probe = await subtle.generateKey(ECDH, false, ['deriveBits']);
+    const a = await ecdh(privateKey, probe.publicKey);
+    const b = await ecdh(probe.privateKey, pub);
+    const same = equalBytes(a, b);
+    wipe(a, b);
+    return same;
+  } catch {
+    return false;
+  }
+}
+
 export async function rewrapIdentity(oldWrapKey, wrapped, iv, newWrapKey) {
   const priv = await unwrapIdentity(oldWrapKey, wrapped, iv, true);
   const newIv = randomBytes(12);
@@ -131,7 +179,24 @@ export async function fingerprint(publicKeyRaw) {
 
 /* ---------------- Nachrichten ---------------- */
 
-export async function encryptMessage({ text, senderPrivateKey, senderPublicKeyRaw, recipientPublicKeyRaw }) {
+/** Zielgroesse: mindestens MIN_PAYLOAD, darueber Padme (≤ 12 % Overhead, leakt O(log log n) Bit). */
+export function paddedLength(n) {
+  if (n <= MIN_PAYLOAD) return MIN_PAYLOAD;
+  const e = Math.floor(Math.log2(n));
+  const s = Math.floor(Math.log2(e)) + 1;
+  const mask = (1 << (e - s)) - 1;
+  return (n + mask) & ~mask;
+}
+
+function encodePayload(obj) {
+  const json = JSON.stringify(obj);
+  const len = enc.encode(json).length;
+  // json endet auf "}" — ersetzt durch ,"p":"<fill>"} kommen 7 Byte plus Fuellung dazu.
+  const fill = paddedLength(len + 7) - len - 7;
+  return enc.encode(json.slice(0, -1) + ',"p":"' + ' '.repeat(fill) + '"}');
+}
+
+export async function encryptMessage({ text, senderPrivateKey, senderPublicKeyRaw, recipientPublicKeyRaw, rotateTo = null }) {
   const recipientPub = await importPublicRaw(recipientPublicKeyRaw);
 
   const eph = await subtle.generateKey(ECDH, true, ['deriveBits']);
@@ -144,14 +209,16 @@ export async function encryptMessage({ text, senderPrivateKey, senderPublicKeyRa
   const dhE = await ecdh(eph.privateKey, recipientPub);
   const dhS = await ecdh(senderPrivateKey, recipientPub);
 
-  const payload = enc.encode(JSON.stringify({ v: 1, t: Date.now(), m: text }));
+  const body0 = { v: 1, t: Date.now(), m: text };
+  if (rotateTo) body0.rk = b64urlEncode(rotateTo);
+  const payload = encodePayload(body0);
   const bodyLen = payload.length + 16; // AES-GCM haengt 16 Byte Tag an
   const lenField = Uint8Array.of(
     (bodyLen >>> 24) & 0xff, (bodyLen >>> 16) & 0xff, (bodyLen >>> 8) & 0xff, bodyLen & 0xff
   );
 
   const head = concat(MAGIC, Uint8Array.of(0), lenField, salt, ephRaw, iv0); // 116
-  const kHdrRaw = await hkdf(dhE, salt, concat(enc.encode('encryptor.one/v1/hdr'), ephRaw));
+  const kHdrRaw = await hkdf(dhE, salt, concat(HDR_INFO, ephRaw));
   const kHdr = await aesKey(kHdrRaw, ['encrypt']);
   const sealed = new Uint8Array(await subtle.encrypt(
     { name: 'AES-GCM', iv: iv0, additionalData: head, tagLength: 128 }, kHdr, senderPublicKeyRaw
@@ -160,7 +227,7 @@ export async function encryptMessage({ text, senderPrivateKey, senderPublicKeyRa
   const head2 = concat(head, sealed, iv1); // 209
   const kBodyRaw = await hkdf(
     concat(dhE, dhS), salt,
-    concat(enc.encode('encryptor.one/v1/body'), ephRaw, senderPublicKeyRaw, recipientPublicKeyRaw)
+    concat(BODY_INFO, ephRaw, senderPublicKeyRaw, recipientPublicKeyRaw)
   );
   const kBody = await aesKey(kBodyRaw, ['encrypt']);
   const body = new Uint8Array(await subtle.encrypt(
@@ -171,7 +238,13 @@ export async function encryptMessage({ text, senderPrivateKey, senderPublicKeyRa
   return MSG_PREFIX + b64urlEncode(concat(head2, body));
 }
 
-export async function decryptMessage({ armored, privateKey, publicKeyRaw }) {
+/**
+ * Entschluesselt mit dem ersten passenden Schluessel aus `keys` (aktueller zuerst,
+ * danach fruehere). Der Header dient dabei als Schluesselerkennung: nur beim
+ * richtigen Schluessel laesst sich der Absender entsiegeln.
+ */
+export async function decryptMessage({ armored, keys, privateKey, publicKeyRaw }) {
+  const ring = keys || [{ privateKey, publicKeyRaw }];
   const bytes = parseEnvelope(armored);
 
   const salt = bytes.slice(OFF.salt, OFF.salt + 32);
@@ -184,26 +257,32 @@ export async function decryptMessage({ armored, privateKey, publicKeyRaw }) {
   const body = bytes.slice(FULL_HDR_LEN);
 
   const ephPub = await importPublicRaw(ephRaw);
-  const dhE = await ecdh(privateKey, ephPub);
 
-  const kHdrRaw = await hkdf(dhE, salt, concat(enc.encode('encryptor.one/v1/hdr'), ephRaw));
-  const kHdr = await aesKey(kHdrRaw, ['decrypt']);
-
-  let senderPublicKeyRaw;
-  try {
-    senderPublicKeyRaw = new Uint8Array(await subtle.decrypt(
-      { name: 'AES-GCM', iv: iv0, additionalData: head, tagLength: 128 }, kHdr, sealed
-    ));
-  } catch {
-    // Passt der Header nicht, war die Nachricht für jemand anderen bestimmt.
-    throw new CryptoError('not_for_you');
+  let keyIndex = -1, dhE = null, senderPublicKeyRaw = null;
+  for (let i = 0; i < ring.length && keyIndex < 0; i++) {
+    const dh = await ecdh(ring[i].privateKey, ephPub);
+    const kHdrRaw = await hkdf(dh, salt, concat(HDR_INFO, ephRaw));
+    const kHdr = await aesKey(kHdrRaw, ['decrypt']);
+    wipe(kHdrRaw);
+    try {
+      senderPublicKeyRaw = new Uint8Array(await subtle.decrypt(
+        { name: 'AES-GCM', iv: iv0, additionalData: head, tagLength: 128 }, kHdr, sealed
+      ));
+      keyIndex = i;
+      dhE = dh;
+    } catch {
+      wipe(dh);
+    }
   }
+  // Passt der Header zu keinem Schluessel, war die Nachricht fuer jemand anderen bestimmt.
+  if (keyIndex < 0) throw new CryptoError('not_for_you');
+  const me = ring[keyIndex];
 
   const senderPub = await importPublicRaw(senderPublicKeyRaw);
-  const dhS = await ecdh(privateKey, senderPub);
+  const dhS = await ecdh(me.privateKey, senderPub);
   const kBodyRaw = await hkdf(
     concat(dhE, dhS), salt,
-    concat(enc.encode('encryptor.one/v1/body'), ephRaw, senderPublicKeyRaw, publicKeyRaw)
+    concat(BODY_INFO, ephRaw, senderPublicKeyRaw, me.publicKeyRaw)
   );
   const kBody = await aesKey(kBodyRaw, ['decrypt']);
 
@@ -214,19 +293,34 @@ export async function decryptMessage({ armored, privateKey, publicKeyRaw }) {
     ));
   } catch {
     throw new CryptoError('tampered');
+  } finally {
+    wipe(dhE, dhS, kBodyRaw);
   }
-
-  wipe(dhE, dhS, kHdrRaw, kBodyRaw);
 
   let payload;
   try { payload = JSON.parse(dec.decode(plain)); } catch { throw new CryptoError('tampered'); }
+  wipe(plain);
 
   return {
     text: typeof payload.m === 'string' ? payload.m : '',
     sentAt: Number.isFinite(payload.t) ? payload.t : null,
     senderPublicKeyRaw,
+    rotateTo: await readRotation(payload.rk, senderPublicKeyRaw),
+    keyIndex,
     envelopeId: (await sha256(bytes)).slice(0, 12)
   };
+}
+
+/** Neuer Schluessel aus dem Payload — nur wenn er ein gueltiger Kurvenpunkt ist. */
+async function readRotation(rk, senderPublicKeyRaw) {
+  if (typeof rk !== 'string' || rk.length > 100) return null;
+  try {
+    const raw = b64urlDecode(rk);
+    await importPublicRaw(raw);
+    return equalBytes(raw, senderPublicKeyRaw) ? null : raw;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -266,7 +360,7 @@ export function parseEnvelope(input) {
 
 export function encodeContactCard(name, publicKeyRaw) {
   const json = enc.encode(JSON.stringify({
-    n: String(name || '').slice(0, 64),
+    n: cleanName(name),
     k: b64urlEncode(publicKeyRaw)
   }));
   const out = new Uint8Array(3 + json.length);
@@ -298,7 +392,7 @@ export function parseContactInput(input) {
       const obj = JSON.parse(dec.decode(bytes.subarray(3)));
       const key = b64urlDecode(obj.k);
       if (key.length !== 65 || key[0] !== 0x04) return null;
-      return { name: String(obj.n || '').slice(0, 64), publicKeyRaw: key };
+      return { name: cleanName(obj.n), publicKeyRaw: key };
     } catch { return null; }
   }
 

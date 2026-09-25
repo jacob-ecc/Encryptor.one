@@ -333,6 +333,7 @@ main {
 }
 .callout .icon-sm { margin-top: 3px; }
 .callout-warn { background: var(--accent-soft); border: 1px solid var(--accent-line); color: var(--ink-2); }
+.callout-info { background: var(--cyan-soft); border: 1px solid var(--line); color: var(--ink-2); }
 
 .meter { height: 4px; background: var(--panel-2); border-radius: 2px; overflow: hidden; margin-top: 9px; }
 .meter-bar { height: 100%; width: 0; background: var(--danger); border-radius: 2px; transition: width .3s var(--ease), background .3s; }

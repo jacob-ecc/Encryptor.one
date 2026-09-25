@@ -2,6 +2,9 @@
 <html lang="de" data-theme="dark" data-theme-pref="system">
 <head>
 <meta charset="utf-8">
+<!-- Zweite Verteidigungslinie, falls ein Host _headers ignoriert (lokal, Spiegel, anderer Anbieter).
+     Muss inhaltlich zu _headers passen; frame-ancestors geht nur als HTTP-Header. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; require-trusted-types-for 'script'; trusted-types sw">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>encryptor.one — verschlüsselte Nachrichten für jeden Kanal</title>
 <meta name="description" content="Ende-zu-Ende-Verschlüsselung direkt im Browser. Schlüssel bleiben auf deinem Gerät, der Chiffretext geht über den Messenger deiner Wahl.">
@@ -220,7 +223,10 @@
         </details>
         <div class="field">
           <label class="label" for="plainInput" data-i18n="enc.msg"></label>
-          <textarea id="plainInput" class="input textarea" rows="6" data-i18n-placeholder="enc.msg.ph"></textarea>
+          <!-- spellcheck aus: Chromes „erweiterte Rechtschreibprüfung“ und Edges Editor schicken
+               getippten Text an Google bzw. Microsoft — bevor er verschlüsselt ist. -->
+          <textarea id="plainInput" class="input textarea" rows="6" spellcheck="false" autocomplete="off"
+                    writingsuggestions="false" data-i18n-placeholder="enc.msg.ph"></textarea>
           <p class="counter" id="plainCounter">0</p>
         </div>
         <button type="button" id="btnEncrypt" class="btn btn-primary btn-block">
@@ -266,6 +272,7 @@
       <div class="panel result-panel" id="decResult" hidden>
         <p class="eyebrow" data-i18n="dec.from"></p>
         <div class="sender" id="decSender"></div>
+        <p class="callout callout-info" id="decNotice" hidden><svg class="icon icon-sm" aria-hidden="true"><use href="#i-refresh"/></svg><span id="decNoticeText"></span></p>
         <p class="eyebrow" data-i18n="dec.plain"></p>
         <div class="plain-out" id="plainOutput"></div>
         <p class="hint" id="decMeta"></p>
@@ -570,6 +577,26 @@
         <option value="0" data-i18n="set.autolock.0"></option>
       </select>
       <p class="hint" data-i18n="set.autolock.hint"></p>
+    </section>
+    <hr class="rule">
+    <section class="setting">
+      <p class="label" data-i18n="set.keys"></p>
+      <p class="hint" data-i18n="set.keys.hint"></p>
+      <p class="hint mono" id="keyInfo"></p>
+      <button type="button" id="btnRotate" class="btn btn-quiet btn-block">
+        <svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg><span data-i18n="set.keys.rotate"></span>
+      </button>
+      <label class="label" for="keepOldSel" data-i18n="set.keys.keep"></label>
+      <select id="keepOldSel" class="input select">
+        <option value="7" data-i18n="set.keys.keep.7"></option>
+        <option value="30" data-i18n="set.keys.keep.30"></option>
+        <option value="90" data-i18n="set.keys.keep.90"></option>
+        <option value="0" data-i18n="set.keys.keep.0"></option>
+      </select>
+      <p class="hint" data-i18n="set.keys.keep.hint"></p>
+      <button type="button" id="btnDropOld" class="btn btn-quiet btn-block" hidden>
+        <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg><span data-i18n="set.keys.drop"></span>
+      </button>
     </section>
     <hr class="rule">
     <section class="setting">

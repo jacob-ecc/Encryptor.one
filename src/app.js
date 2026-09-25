@@ -2,20 +2,22 @@
 
 import {
   $, $$, el, clear, icon, copyText, b64urlEncode, b64urlDecode,
-  scrambleTo, formatDateTime, toHex, prefersReducedMotion
+  scrambleTo, formatDateTime, toHex, prefersReducedMotion, cleanName
 } from './util.js';
 import {
   CRYPTO_AVAILABLE, KDF_ITERATIONS, CryptoError,
-  createIdentity, unwrapIdentity, rewrapIdentity, deriveVaultKeys,
+  createIdentity, unwrapIdentity, rewrapIdentity, deriveVaultKeys, keyPairMatches,
   sealJSON, openJSON, encryptMessage, decryptMessage, fingerprint,
-  encodeContactCard, parseContactInput, importPublicRaw, randomBytes, sha256
+  encodeContactCard, parseContactInput, importPublicRaw, randomBytes, randomInt, sha256
 } from './crypto.js';
-import { readMeta, writeMeta, readData, writeData, hasVault, destroyVault, prefs } from './store.js';
+import { readMeta, readData, writeData, writeVault, hasVault, destroyVault, prefs } from './store.js';
 import { t, setLang, getLang, detectLang, WORDS } from './i18n.js';
 import { sigil } from './sigil.js';
 
-const VERSION = '2.0.0';
+const VERSION = '2.1.0';
 const MAX_MESSAGE = 20000;
+const DAY = 86400000;
+const DEFAULT_SETTINGS = { autolock: 15, keepOld: 30 };
 
 const state = {
   publicKeyRaw: null,
@@ -24,13 +26,15 @@ const state = {
   dataKey: null,
   wrapped: null,
   wrapIv: null,
+  prev: [],          // fruehere Schluessel nach einem Wechsel: { publicKeyRaw, privateKey, retiredAt }
   meta: null,
   fp: null,
   contacts: [],
   seen: [],
-  settings: { autolock: 15 },
+  settings: { ...DEFAULT_SETTINGS },
   view: 'encrypt',
   pendingCard: null,
+  addPrev: null,     // { key, prev } — Absender, der beim Speichern gleich einen Wechsel mitbringt
   lastCipher: '',
   lastActivity: Date.now()
 };
@@ -78,15 +82,21 @@ async function boot() {
 
   registerServiceWorker();
   setInterval(autolockTick, 15000);
-  for (const evt of ['pointerdown', 'keydown', 'visibilitychange']) {
+  for (const evt of ['pointerdown', 'keydown']) {
     document.addEventListener(evt, () => { state.lastActivity = Date.now(); }, { passive: true });
   }
+  // Zurueck im Tab zaehlt nicht als Aktivitaet: Mobile Browser frieren Hintergrund-Tabs
+  // ein, der Timer lief also nicht. Erst pruefen, ob die Sperrfrist abgelaufen ist.
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) autolockTick(); });
+  window.addEventListener('pageshow', autolockTick);
 }
 
 function readInviteFromUrl() {
   const hash = location.hash.slice(1);
   if (!hash) return;
-  const card = parseContactInput(decodeURIComponent(hash));
+  let raw = hash;
+  try { raw = decodeURIComponent(hash); } catch { /* kaputtes %-Escape: roh versuchen */ }
+  const card = parseContactInput(raw);
   if (card) state.pendingCard = card;
   history.replaceState(null, '', location.pathname + location.search);
 }
@@ -165,7 +175,7 @@ function afterLangChange() {
   $('#btnLang').textContent = getLang().toUpperCase();
   for (const b of $$('#langSeg button')) b.setAttribute('aria-pressed', String(b.dataset.langVal === getLang()));
   renderStepIndices();
-  if (state.privateKey) { renderContacts(); renderRecipients(); }
+  if (state.privateKey) { renderContacts(); renderRecipients(); renderKeyInfo(); }
   updateLandingCta(!!state.meta);
 }
 
@@ -199,8 +209,7 @@ function wireSetup() {
 
   $('#btnSuggestPass').addEventListener('click', async () => {
     const words = [];
-    const bytes = randomBytes(8);
-    for (let i = 0; i < 8; i++) words.push(WORDS[bytes[i] % WORDS.length]);
+    for (let i = 0; i < 8; i++) words.push(WORDS[randomInt(WORDS.length)]);
     const suggestion = words.join('-');
     $('#setupPass').value = suggestion;
     $('#setupPass2').value = suggestion;
@@ -240,8 +249,8 @@ function wireSetup() {
       };
       state.contacts = [];
       state.seen = [];
-      await writeMeta(state.meta);
-      await persistData();
+      state.prev = [];
+      await persistVault();
       $('#dlgSetup').close();
       $('#setupPass').value = $('#setupPass2').value = '';
       await enterApp();
@@ -290,24 +299,11 @@ function wireUnlock() {
     if (!pass) return;
 
     await withBusy($('#unlockSubmit'), t('setup.working'), async () => {
+      let meta, keys, priv;
       try {
-        const meta = state.meta || await readMeta();
-        const { wrapKey, dataKey } = await deriveVaultKeys(pass, meta.kdf.salt, meta.kdf.iterations);
-        const priv = await unwrapIdentity(wrapKey, meta.wrapped, meta.iv);
-
-        state.meta = meta;
-        state.wrapKey = wrapKey;
-        state.dataKey = dataKey;
-        state.privateKey = priv;
-        state.publicKeyRaw = meta.publicKeyRaw;
-        state.wrapped = meta.wrapped;
-        state.wrapIv = meta.iv;
-
-        await loadData();
-        prefs.remove('fails');
-        prefs.remove('lockUntil');
-        $('#unlockPass').value = '';
-        await enterApp();
+        meta = state.meta || await readMeta();
+        keys = await deriveVaultKeys(pass, meta.kdf.salt, meta.kdf.iterations);
+        priv = await unwrapIdentity(keys.wrapKey, meta.wrapped, meta.iv);
       } catch {
         const fails = Number(prefs.get('fails', 0)) + 1;
         prefs.set('fails', fails);
@@ -315,8 +311,20 @@ function wireUnlock() {
           const wait = Math.min(120, 2 ** (fails - 2)) * 1000;
           prefs.set('lockUntil', Date.now() + wait);
         }
-        showError(err, t('unlock.wrong'));
+        return showError(err, t('unlock.wrong'));
       }
+
+      // Ab hier stimmt die Passphrase. Was jetzt scheitert, ist ein beschaedigter
+      // oder manipulierter Vault — das darf nicht als Tippfehler durchgehen.
+      prefs.remove('fails');
+      prefs.remove('lockUntil');
+      try {
+        await openVault(meta, keys, priv);
+      } catch {
+        return showError(err, t('unlock.corrupt'));
+      }
+      $('#unlockPass').value = '';
+      await enterApp();
     });
   });
 
@@ -332,6 +340,29 @@ function wireUnlock() {
   });
 }
 
+/** Entpackt alle Schluessel, prueft, dass jeder zu seinem Public Key passt, laedt die Daten. */
+async function openVault(meta, { wrapKey, dataKey }, privateKey) {
+  if (!(await keyPairMatches(privateKey, meta.publicKeyRaw))) throw new Error('integrity');
+  const prev = [];
+  for (const p of meta.prev || []) {
+    const k = await unwrapIdentity(wrapKey, p.wrapped, p.iv);
+    if (!(await keyPairMatches(k, p.publicKeyRaw))) throw new Error('integrity');
+    prev.push({ publicKeyRaw: p.publicKeyRaw, privateKey: k, retiredAt: p.retiredAt });
+  }
+
+  state.meta = meta;
+  state.wrapKey = wrapKey;
+  state.dataKey = dataKey;
+  state.privateKey = privateKey;
+  state.publicKeyRaw = meta.publicKeyRaw;
+  state.wrapped = meta.wrapped;
+  state.wrapIv = meta.iv;
+  state.prev = prev;
+
+  await loadData();
+  await expireOldKeys();
+}
+
 async function enterApp() {
   state.fp = await fingerprint(state.publicKeyRaw);
   mountGuide('app');
@@ -339,6 +370,8 @@ async function enterApp() {
   setView('encrypt');
   await renderIdentity();
   $('#autolockSel').value = String(state.settings.autolock);
+  $('#keepOldSel').value = String(state.settings.keepOld);
+  renderKeyInfo();
   syncThemeButton();
   afterLangChange();
 
@@ -353,6 +386,8 @@ function lock() {
   state.privateKey = null;
   state.wrapKey = null;
   state.dataKey = null;
+  state.prev = [];
+  state.addPrev = null;
   state.contacts = [];
   state.seen = [];
   state.lastCipher = '';
@@ -366,6 +401,7 @@ function lock() {
   $('#backupOut').value = '';
   $('#backupOut').hidden = true;
   $('#decMeta').textContent = '';
+  $('#decNotice').hidden = true;
   $('#myFingerprint').textContent = '';
   clear($('#mySeal'));
   clear($('#decSender'));
@@ -392,19 +428,32 @@ async function loadData() {
   const data = await openJSON(state.dataKey, rec);
   state.contacts = Array.isArray(data.contacts) ? data.contacts : [];
   state.seen = Array.isArray(data.seen) ? data.seen.slice(-300) : [];
-  state.settings = Object.assign({ autolock: 15 }, data.settings || {});
+  state.settings = Object.assign({ ...DEFAULT_SETTINGS }, data.settings || {});
 }
 
-async function persistData() {
-  const rec = await sealJSON(state.dataKey, {
+function sealData(dataKey = state.dataKey) {
+  return sealJSON(dataKey, {
     contacts: state.contacts,
     seen: state.seen.slice(-300),
     settings: state.settings
   });
-  await writeData(rec);
 }
 
-function contactByKey(b64) { return state.contacts.find((c) => c.k === b64) || null; }
+async function persistData() {
+  await writeData(await sealData());
+}
+
+/** meta und data zusammen, in einer Transaktion. */
+async function persistVault() {
+  await writeVault(state.meta, await sealData());
+}
+
+/** Kontakt zu einem Public Key — aktueller Schluessel oder einer, den er vorher hatte. */
+function contactByKey(b64) {
+  return state.contacts.find((c) => c.k === b64)
+    || state.contacts.find((c) => Array.isArray(c.pk) && c.pk.includes(b64))
+    || null;
+}
 
 async function contactVisual(c) {
   const raw = b64urlDecode(c.k);
@@ -468,12 +517,13 @@ async function doEncrypt() {
 
   let recipientRaw = null;
   let recipientName = '';
+  let contact = null;
   const sel = $('#recipient').value;
   const manual = $('#manualKey').value.trim();
 
   if (sel) {
-    const c = state.contacts.find((x) => x.id === sel);
-    if (c) { recipientRaw = b64urlDecode(c.k); recipientName = c.n; }
+    contact = state.contacts.find((x) => x.id === sel) || null;
+    if (contact) { recipientRaw = b64urlDecode(contact.k); recipientName = contact.n; }
   } else if (manual) {
     const parsed = parseContactInput(manual);
     if (!parsed) return showError(err, t('enc.err.key'));
@@ -482,17 +532,28 @@ async function doEncrypt() {
   }
   if (!recipientRaw) return showError(err, t('enc.err.recipient'));
 
+  // Kennt der Kontakt noch einen frueheren Schluessel von uns, geht die Nachricht von
+  // diesem aus (nur den kann er pruefen) und traegt den aktuellen als Update mit.
+  let sender = { privateKey: state.privateKey, publicKeyRaw: state.publicKeyRaw };
+  let rotateTo = null;
+  const known = contact && contact.mk && state.prev.find((p) => b64urlEncode(p.publicKeyRaw) === contact.mk);
+  if (known) {
+    sender = known;
+    rotateTo = state.publicKeyRaw;
+  }
+
   await withBusy($('#btnEncrypt'), null, async () => {
     try {
       await importPublicRaw(recipientRaw);
       const armored = await encryptMessage({
         text,
-        senderPrivateKey: state.privateKey,
-        senderPublicKeyRaw: state.publicKeyRaw,
-        recipientPublicKeyRaw: recipientRaw
+        senderPrivateKey: sender.privateKey,
+        senderPublicKeyRaw: sender.publicKeyRaw,
+        recipientPublicKeyRaw: recipientRaw,
+        rotateTo
       });
       state.lastCipher = armored;
-      $('#encStatus').textContent = t('enc.done', { name: recipientName });
+      $('#encStatus').textContent = t('enc.done', { name: recipientName }) + (rotateTo ? ' ' + t('rot.included') : '');
       $('#encResult').hidden = false;
       await scrambleTo($('#cipherOutput'), armored, { duration: 620, max: 4000 });
       $('#encResult').scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'nearest' });
@@ -522,15 +583,22 @@ async function doDecrypt() {
 
   await withBusy($('#btnDecrypt'), null, async () => {
     try {
-      const res = await decryptMessage({
-        armored,
-        privateKey: state.privateKey,
-        publicKeyRaw: state.publicKeyRaw
-      });
+      const res = await decryptMessage({ armored, keys: keyRing() });
 
       const senderB64 = b64urlEncode(res.senderPublicKeyRaw);
       const known = contactByKey(senderB64);
-      const senderFp = await fingerprint(res.senderPublicKeyRaw);
+      let changed = false;
+      let rotated = false;
+
+      if (known) {
+        // An unseren aktuellen Schluessel geschrieben: der Kontakt hat das Update.
+        if (res.keyIndex === 0 && known.mk) { delete known.mk; changed = true; }
+        rotated = applyRotation(known, senderB64, res.rotateTo);
+        changed = changed || rotated;
+      }
+
+      const shownKey = rotated ? res.rotateTo : res.senderPublicKeyRaw;
+      const senderFp = await fingerprint(shownKey);
 
       const box = $('#decSender');
       clear(box);
@@ -545,9 +613,12 @@ async function doDecrypt() {
           t(known.v ? 'con.verified' : 'con.unverified')
         ));
       } else {
+        // Bringt die Nachricht einen neuen Schluessel mit, wird gleich dieser gespeichert —
+        // er ist es, dessen Fingerabdruck das Gegenueber jetzt in seiner App sieht.
         box.appendChild(el('button', {
           class: 'btn btn-small btn-quiet',
-          onclick: () => openAddContact({ name: '', publicKeyRaw: res.senderPublicKeyRaw })
+          onclick: () => openAddContact({ name: '', publicKeyRaw: res.rotateTo || res.senderPublicKeyRaw },
+            res.rotateTo ? senderB64 : null)
         }, t('dec.addsender')));
       }
 
@@ -555,13 +626,21 @@ async function doDecrypt() {
       const duplicate = state.seen.includes(id);
       if (!duplicate) {
         state.seen.push(id);
-        await persistData();
+        changed = true;
       }
+      if (changed) await persistData();
+      if (rotated) { renderContacts(); renderRecipients(); }
+
+      const notice = $('#decNotice');
+      notice.hidden = !rotated;
+      if (rotated) $('#decNoticeText').textContent = t('rot.applied', { name: known.n, fp: senderFp.text });
 
       const meta = [];
       if (res.sentAt) meta.push(`${t('dec.sentAt')}: ${formatDateTime(res.sentAt, getLang())}`);
       if (duplicate) meta.push(t('dec.dup'));
       if (!known) meta.push(t('dec.unknownHint'));
+      if (known && !rotated && known.k !== senderB64) meta.push(t('dec.theirOldKey'));
+      if (res.keyIndex > 0) meta.push(t('dec.myOldKey'));
       $('#decMeta').textContent = meta.join(' · ');
 
       $('#decResult').hidden = false;
@@ -571,6 +650,29 @@ async function doDecrypt() {
       showError(err, t('dec.err.' + code) === 'dec.err.' + code ? t('err.generic') : t('dec.err.' + code));
     }
   });
+}
+
+function keyRing() {
+  return [
+    { privateKey: state.privateKey, publicKeyRaw: state.publicKeyRaw },
+    ...state.prev.map((p) => ({ privateKey: p.privateKey, publicKeyRaw: p.publicKeyRaw }))
+  ];
+}
+
+/**
+ * Uebernimmt einen neuen Schluessel des Kontakts. Nur vom *aktuellen* Schluessel des
+ * Kontakts aus: ein Update, das von einem schon abgeloesten Schluessel kommt, ist
+ * veraltet oder wiedereingespielt und darf nicht zurueckrollen. Der Pruefstatus
+ * bleibt erhalten — das Update ist mit dem bisherigen Schluessel authentifiziert.
+ */
+function applyRotation(contact, senderB64, rotateTo) {
+  if (!rotateTo || contact.k !== senderB64) return false;
+  const next = b64urlEncode(rotateTo);
+  if (next === b64urlEncode(state.publicKeyRaw) || contactByKey(next)) return false;
+  contact.pk = [contact.k, ...(contact.pk || [])].slice(0, 8);
+  contact.k = next;
+  contact.rt = Date.now();
+  return true;
 }
 
 /* ================= Kontakte ================= */
@@ -597,8 +699,15 @@ function wireContacts() {
     const existing = contactByKey(b64);
     if (existing) return showError(err, t('con.add.exists', { name: existing.n }));
 
-    const name = $('#contactName').value.trim() || parsed.name || t('dec.unknown');
-    state.contacts.push({ id: toHex(randomBytes(8)), n: name.slice(0, 64), k: b64, v: false, t: Date.now() });
+    const name = cleanName($('#contactName').value) || parsed.name || t('dec.unknown');
+    const entry = { id: toHex(randomBytes(8)), n: name, k: b64, v: false, t: Date.now() };
+    // Stammt der Schluessel aus einem Update, bleibt der alte als Vorgaenger bekannt —
+    // sonst erschiene die naechste Nachricht, die noch vom alten kommt, als Fremder.
+    if (state.addPrev && state.addPrev.key === b64 && !contactByKey(state.addPrev.prev)) {
+      entry.pk = [state.addPrev.prev];
+    }
+    state.addPrev = null;
+    state.contacts.push(entry);
     state.contacts.sort((a, b) => a.n.localeCompare(b.n));
     await persistData();
     renderContacts();
@@ -614,7 +723,8 @@ function myLink() {
   return base + '#' + encodeContactCard('', state.publicKeyRaw);
 }
 
-function openAddContact(card) {
+function openAddContact(card, prevKey = null) {
+  state.addPrev = card && prevKey ? { key: b64urlEncode(card.publicKeyRaw), prev: prevKey } : null;
   $('#contactError').hidden = true;
   $('#contactInput').value = card ? encodeContactCard(card.name || '', card.publicKeyRaw) : '';
   $('#contactName').value = card && card.name ? card.name : '';
@@ -700,6 +810,17 @@ async function openContactDetail(c) {
     )
   ));
 
+  if (c.rt) {
+    body.appendChild(el('p', { class: 'hint', text: t('rot.contactChanged', { date: formatDateTime(c.rt, getLang()) }) }));
+  }
+  if (c.mk && state.prev.some((p) => b64urlEncode(p.publicKeyRaw) === c.mk)) {
+    body.appendChild(el('p', { class: 'callout callout-info' },
+      icon('refresh', 'icon icon-sm'), el('span', { text: t('rot.pending', { name: c.n }) })));
+    body.appendChild(el('div', { class: 'btn-row' }, el('button', {
+      class: 'btn btn-primary', type: 'button', onclick: () => composeKeyUpdate(c)
+    }, icon('refresh'), t('rot.compose'))));
+  }
+
   body.appendChild(el('p', { class: 'label-sm', text: t('con.verify') }));
   body.appendChild(el('p', { class: 'hint', text: t('con.verifyBody') }));
 
@@ -719,7 +840,7 @@ async function openContactDetail(c) {
     onclick: () => {
       const field = el('input', { class: 'input', value: c.n, maxlength: 64 });
       const save = el('button', { class: 'btn btn-primary', type: 'button', onclick: async () => {
-        c.n = (field.value.trim() || c.n).slice(0, 64);
+        c.n = cleanName(field.value) || c.n;
         state.contacts.sort((a, b) => a.n.localeCompare(b.n));
         await persistData();
         renderContacts();
@@ -769,6 +890,84 @@ async function openContactDetail(c) {
   openDialog('#dlgDetail');
 }
 
+/** Fuellt den Verschluesseln-Tab mit einer Update-Nachricht an genau diesen Kontakt. */
+async function composeKeyUpdate(c) {
+  $('#dlgDetail').close();
+  setView('encrypt');
+  $('#manualKey').value = '';
+  $('#recipient').value = c.id;
+  $('#plainInput').value = t('rot.message', { fp: state.fp.text });
+  $('#plainCounter').textContent = String($('#plainInput').value.length);
+  await doEncrypt();
+}
+
+/* ================= Schluesselwechsel ================= */
+
+async function rotateKey() {
+  const id = await createIdentity(state.wrapKey);
+  const now = Date.now();
+  const oldB64 = b64urlEncode(state.publicKeyRaw);
+  const retired = {
+    publicKeyRaw: state.meta.publicKeyRaw, wrapped: state.meta.wrapped, iv: state.meta.iv,
+    createdAt: state.meta.createdAt, retiredAt: now
+  };
+  const meta = Object.assign({}, state.meta, {
+    createdAt: now, publicKeyRaw: id.publicKeyRaw, wrapped: id.wrapped, iv: id.iv,
+    prev: [retired, ...(state.meta.prev || [])]
+  });
+
+  // Jeder Kontakt kennt bis auf Weiteres nur den bisherigen Schluessel. Wer schon auf ein
+  // noch aelteres Update wartet, behaelt diesen Stand — den kann er ja pruefen.
+  const pending = state.contacts.filter((c) => !c.mk);
+  for (const c of pending) c.mk = oldB64;
+  try {
+    await writeVault(meta, await sealData());
+  } catch (e) {
+    for (const c of pending) delete c.mk;
+    throw e;
+  }
+
+  state.meta = meta;
+  state.prev = [{ publicKeyRaw: retired.publicKeyRaw, privateKey: state.privateKey, retiredAt: now }, ...state.prev];
+  state.privateKey = id.privateKey;
+  state.publicKeyRaw = id.publicKeyRaw;
+  state.wrapped = id.wrapped;
+  state.wrapIv = id.iv;
+  state.fp = await fingerprint(id.publicKeyRaw);
+  await renderIdentity();
+  renderKeyInfo();
+}
+
+/** Loescht fruehere Schluessel, deren Aufbewahrungsfrist abgelaufen ist. */
+async function expireOldKeys() {
+  const days = Number(state.settings.keepOld);
+  if (!days || !state.prev.length) return;
+  const cutoff = Date.now() - days * DAY;
+  const keep = state.prev.filter((p) => p.retiredAt > cutoff);
+  if (keep.length !== state.prev.length) await dropOldKeys(keep);
+}
+
+async function dropOldKeys(keep = []) {
+  const kept = new Set(keep.map((p) => b64urlEncode(p.publicKeyRaw)));
+  // Wer nur einen geloeschten Schluessel kennt, bekommt kuenftig Post vom aktuellen und
+  // muss dich neu hinzufuegen — ein Update koennte er ohnehin nicht mehr pruefen.
+  for (const c of state.contacts) if (c.mk && !kept.has(c.mk)) delete c.mk;
+  state.meta = Object.assign({}, state.meta, {
+    prev: (state.meta.prev || []).filter((p) => kept.has(b64urlEncode(p.publicKeyRaw)))
+  });
+  state.prev = keep;
+  await persistVault();
+  renderKeyInfo();
+}
+
+function renderKeyInfo() {
+  if (!state.meta) return;
+  const parts = [t('set.keys.since', { date: formatDateTime(state.meta.createdAt, getLang()) })];
+  if (state.prev.length) parts.push(t('set.keys.old', { n: state.prev.length }));
+  $('#keyInfo').textContent = parts.join(' · ');
+  $('#btnDropOld').hidden = state.prev.length === 0;
+}
+
 /* ================= Einstellungen, Sicherung ================= */
 
 function wireSettings() {
@@ -783,6 +982,39 @@ function wireSettings() {
     await persistData();
   });
   $('#btnLockNow').addEventListener('click', () => { $('#dlgSettings').close(); lock(); });
+
+  $('#keepOldSel').addEventListener('change', async (e) => {
+    state.settings.keepOld = Number(e.target.value);
+    await persistData();
+    await expireOldKeys();
+  });
+  $('#btnRotate').addEventListener('click', () => {
+    $('#dlgSettings').close();
+    confirmDialog({
+      title: t('rot.confirmTitle'),
+      body: t('rot.confirmBody'),
+      okLabel: t('rot.confirmOk'),
+      onOk: async () => {
+        try {
+          await rotateKey();
+        } catch {
+          return toast(t('err.generic'), 'warn');
+        }
+        renderContacts();
+        setView('contacts');
+        toast(t('rot.done'), 'ok', 9000);
+      }
+    });
+  });
+  $('#btnDropOld').addEventListener('click', () => {
+    $('#dlgSettings').close();
+    confirmDialog({
+      title: t('set.keys.drop'),
+      body: t('set.keys.dropConfirm'),
+      okLabel: t('set.keys.drop'),
+      onOk: async () => { await dropOldKeys([]); toast(t('set.keys.dropped')); }
+    });
+  });
 
   $('#btnExport').addEventListener('click', exportBackup);
   $('#btnImport').addEventListener('click', () => $('#importFile').click());
@@ -813,8 +1045,16 @@ async function exportBackup() {
     identity: {
       publicKey: b64urlEncode(state.meta.publicKeyRaw),
       wrapped: b64urlEncode(state.meta.wrapped),
-      iv: b64urlEncode(state.meta.iv)
+      iv: b64urlEncode(state.meta.iv),
+      createdAt: state.meta.createdAt
     },
+    previous: (state.meta.prev || []).map((p) => ({
+      publicKey: b64urlEncode(p.publicKeyRaw),
+      wrapped: b64urlEncode(p.wrapped),
+      iv: b64urlEncode(p.iv),
+      createdAt: p.createdAt,
+      retiredAt: p.retiredAt
+    })),
     data: data ? { iv: b64urlEncode(data.iv), ct: b64urlEncode(data.ct) } : null
   };
   const text = JSON.stringify(payload, null, 2);
@@ -848,26 +1088,16 @@ async function importBackup(e) {
   $('#dlgSettings').close();
 
   const restore = async () => {
-    let meta;
+    let meta, data;
     try {
-      meta = {
-        v: 1, createdAt: payload.createdAt || Date.now(),
-        kdf: { iterations: payload.kdf.iterations || KDF_ITERATIONS, salt: b64urlDecode(payload.kdf.salt) },
-        publicKeyRaw: b64urlDecode(payload.identity.publicKey),
-        wrapped: b64urlDecode(payload.identity.wrapped),
-        iv: b64urlDecode(payload.identity.iv)
-      };
-      if (meta.publicKeyRaw.length !== 65 || meta.publicKeyRaw[0] !== 4) throw new Error('key');
+      ({ meta, data } = parseBackup(payload));
     } catch {
       return toast(t('set.backup.bad'), 'warn');
     }
 
-    await writeMeta(meta);
-    if (payload.data) {
-      await writeData({ iv: b64urlDecode(payload.data.iv), ct: b64urlDecode(payload.data.ct) });
-    } else {
-      await writeData(null);
-    }
+    // Ob Public Key und verpackter Schluessel zusammenpassen, laesst sich erst mit der
+    // Passphrase pruefen — das passiert beim naechsten Entsperren (openVault).
+    await writeVault(meta, data);
     state.meta = meta;
     state.privateKey = null;
     prefs.remove('fails');
@@ -887,6 +1117,45 @@ async function importBackup(e) {
   });
 }
 
+/** Sicherungsdatei → Vault-Datensaetze. Alles, was von aussen kommt, wird geprueft. */
+function parseBackup(payload) {
+  const bytes = (v, min, max) => {
+    const b = b64urlDecode(String(v));
+    if (b.length < min || b.length > max) throw new Error('backup');
+    return b;
+  };
+  const key = (rec) => {
+    const publicKeyRaw = bytes(rec.publicKey, 65, 65);
+    if (publicKeyRaw[0] !== 4) throw new Error('backup');
+    return {
+      publicKeyRaw,
+      wrapped: bytes(rec.wrapped, 48, 1024),
+      iv: bytes(rec.iv, 12, 12),
+      createdAt: Number(rec.createdAt) || null,
+      retiredAt: Number(rec.retiredAt) || null
+    };
+  };
+  // Eine manipulierte Datei soll das Entsperren weder abschwaechen noch einfrieren koennen.
+  const iterations = payload.kdf.iterations ?? KDF_ITERATIONS;
+  if (!Number.isInteger(iterations) || iterations < 100_000 || iterations > 10_000_000) throw new Error('backup');
+
+  const current = key(payload.identity);
+  const prev = (Array.isArray(payload.previous) ? payload.previous : []).slice(0, 32).map(key);
+  if (prev.some((p) => !p.retiredAt)) throw new Error('backup');
+
+  const meta = {
+    v: 1,
+    createdAt: current.createdAt || Number(payload.createdAt) || Date.now(),
+    kdf: { iterations, salt: bytes(payload.kdf.salt, 16, 64) },
+    publicKeyRaw: current.publicKeyRaw, wrapped: current.wrapped, iv: current.iv,
+    prev
+  };
+  const data = payload.data
+    ? { iv: bytes(payload.data.iv, 12, 12), ct: bytes(payload.data.ct, 16, 8_000_000) }
+    : null;
+  return { meta, data };
+}
+
 async function changePassphrase(e) {
   e.preventDefault();
   const err = $('#passError');
@@ -904,15 +1173,20 @@ async function changePassphrase(e) {
       const salt = randomBytes(16);
       const newKeys = await deriveVaultKeys(newPass, salt);
       const rewrapped = await rewrapIdentity(oldKeys.wrapKey, state.meta.wrapped, state.meta.iv, newKeys.wrapKey);
+      const prev = [];
+      for (const p of state.meta.prev || []) {
+        const r = await rewrapIdentity(oldKeys.wrapKey, p.wrapped, p.iv, newKeys.wrapKey);
+        prev.push(Object.assign({}, p, { wrapped: r.wrapped, iv: r.iv }));
+      }
 
-      state.meta = Object.assign({}, state.meta, {
+      const meta = Object.assign({}, state.meta, {
         kdf: { iterations: KDF_ITERATIONS, salt },
-        wrapped: rewrapped.wrapped, iv: rewrapped.iv
+        wrapped: rewrapped.wrapped, iv: rewrapped.iv, prev
       });
+      await writeVault(meta, await sealData(newKeys.dataKey));
+      state.meta = meta;
       state.wrapKey = newKeys.wrapKey;
       state.dataKey = newKeys.dataKey;
-      await writeMeta(state.meta);
-      await persistData();
       $('#passOld').value = $('#passNew').value = '';
       toast(t('set.pass.done'));
     } catch {
@@ -1046,7 +1320,15 @@ function confirmDialog({ title, body, okLabel, onOk }) {
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   if (location.protocol !== 'https:' && location.hostname !== 'localhost') return;
-  navigator.serviceWorker.register('/sw.js').then((reg) => {
+  // Die CSP verlangt Trusted Types. register() ist eine Script-URL-Senke und nimmt ohne
+  // Policy keinen String an — die Policy laesst genau eine URL durch, sonst nichts.
+  let url = '/sw.js';
+  if (window.trustedTypes) {
+    url = trustedTypes.createPolicy('sw', {
+      createScriptURL: (u) => { if (u !== '/sw.js') throw new TypeError('sw'); return u; }
+    }).createScriptURL(url);
+  }
+  navigator.serviceWorker.register(url).then((reg) => {
     reg.addEventListener('updatefound', () => {
       const sw = reg.installing;
       if (!sw) return;
