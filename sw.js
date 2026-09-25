@@ -2,7 +2,7 @@
 // Installieren gecacht, danach cache-first ausgeliefert. Neue Versionen
 // bekommen einen neuen Cache-Namen; alte werden beim Aktivieren entfernt.
 
-const CACHE = 'encryptor-one-v2.1.0';
+const CACHE = 'encryptor-one-v2.1.1';
 const ASSETS = [
   '/',
   '/index.html',

@@ -14,7 +14,7 @@ import { readMeta, readData, writeData, writeVault, hasVault, destroyVault, pref
 import { t, setLang, getLang, detectLang, WORDS } from './i18n.js';
 import { sigil } from './sigil.js';
 
-const VERSION = '2.1.0';
+const VERSION = '2.1.1';
 const MAX_MESSAGE = 20000;
 const DAY = 86400000;
 const DEFAULT_SETTINGS = { autolock: 15, keepOld: 30 };
@@ -534,12 +534,17 @@ async function doEncrypt() {
 
   // Kennt der Kontakt noch einen frueheren Schluessel von uns, geht die Nachricht von
   // diesem aus (nur den kann er pruefen) und traegt den aktuellen als Update mit.
+  // Nach mehreren Wechseln kennt der Kontakt womoeglich schon einen neueren Schluessel als
+  // den, von dem wir senden. Deshalb beglaubigen alle anderen frueheren Schluessel das
+  // Update mit — der Kontakt prueft die Beglaubigung desjenigen, den er gespeichert hat.
   let sender = { privateKey: state.privateKey, publicKeyRaw: state.publicKeyRaw };
   let rotateTo = null;
+  let endorsers = [];
   const known = contact && contact.mk && state.prev.find((p) => b64urlEncode(p.publicKeyRaw) === contact.mk);
   if (known) {
     sender = known;
     rotateTo = state.publicKeyRaw;
+    endorsers = state.prev.filter((p) => p !== known);
   }
 
   await withBusy($('#btnEncrypt'), null, async () => {
@@ -550,7 +555,8 @@ async function doEncrypt() {
         senderPrivateKey: sender.privateKey,
         senderPublicKeyRaw: sender.publicKeyRaw,
         recipientPublicKeyRaw: recipientRaw,
-        rotateTo
+        rotateTo,
+        endorsers
       });
       state.lastCipher = armored;
       $('#encStatus').textContent = t('enc.done', { name: recipientName }) + (rotateTo ? ' ' + t('rot.included') : '');
@@ -593,7 +599,7 @@ async function doDecrypt() {
       if (known) {
         // An unseren aktuellen Schluessel geschrieben: der Kontakt hat das Update.
         if (res.keyIndex === 0 && known.mk) { delete known.mk; changed = true; }
-        rotated = applyRotation(known, senderB64, res.rotateTo);
+        rotated = await applyRotation(known, res);
         changed = changed || rotated;
       }
 
@@ -660,15 +666,29 @@ function keyRing() {
 }
 
 /**
- * Uebernimmt einen neuen Schluessel des Kontakts. Nur vom *aktuellen* Schluessel des
- * Kontakts aus: ein Update, das von einem schon abgeloesten Schluessel kommt, ist
- * veraltet oder wiedereingespielt und darf nicht zurueckrollen. Der Pruefstatus
- * bleibt erhalten — das Update ist mit dem bisherigen Schluessel authentifiziert.
+ * Uebernimmt einen neuen Schluessel des Kontakts — aber nur, wenn genau der Schluessel,
+ * den wir fuer ihn gespeichert haben, das Update beglaubigt. Kommt die Nachricht von
+ * einem aelteren Schluessel, muss sie eine Beglaubigung des aktuellen mitbringen. So kann
+ * weder ein wiedereingespieltes altes Update zurueckrollen, noch jemand, der einen
+ * ausgemusterten Schluessel erbeutet hat, den Kontakt umlenken. Der Pruefstatus bleibt
+ * erhalten: Die Kette beginnt beim bisherigen, geprueften Schluessel.
  */
-function applyRotation(contact, senderB64, rotateTo) {
-  if (!rotateTo || contact.k !== senderB64) return false;
-  const next = b64urlEncode(rotateTo);
-  if (next === b64urlEncode(state.publicKeyRaw) || contactByKey(next)) return false;
+async function applyRotation(contact, res) {
+  if (!res.rotateTo) return false;
+  const next = b64urlEncode(res.rotateTo);
+  if (next === contact.k || next === b64urlEncode(state.publicKeyRaw)) return false;
+  if ((contact.pk || []).includes(next)) return false; // kein Zurueckrollen
+  if (!(await res.vouchedBy(b64urlDecode(contact.k)))) return false;
+
+  // Hat jemand die neue Kontaktkarte schon separat gespeichert, fuehren wir beide
+  // Eintraege zusammen. Einen geprueften Eintrag oder einen mit eigener Schluessel-
+  // geschichte fassen wir nicht an — da entscheidet der Mensch.
+  const dup = state.contacts.find((x) => x !== contact && (x.k === next || (x.pk || []).includes(next)));
+  if (dup) {
+    if (dup.v || dup.k !== next || (dup.pk || []).length) return false;
+    state.contacts = state.contacts.filter((x) => x !== dup);
+  }
+
   contact.pk = [contact.k, ...(contact.pk || [])].slice(0, 8);
   contact.k = next;
   contact.rt = Date.now();
@@ -949,9 +969,14 @@ async function expireOldKeys() {
 
 async function dropOldKeys(keep = []) {
   const kept = new Set(keep.map((p) => b64urlEncode(p.publicKeyRaw)));
-  // Wer nur einen geloeschten Schluessel kennt, bekommt kuenftig Post vom aktuellen und
-  // muss dich neu hinzufuegen — ein Update koennte er ohnehin nicht mehr pruefen.
-  for (const c of state.contacts) if (c.mk && !kept.has(c.mk)) delete c.mk;
+  // Kennt ein Kontakt nur einen Schluessel, der jetzt geloescht wird, senden wir vom
+  // aeltesten verbliebenen aus — vielleicht hat er dessen Update ja bekommen. Bleibt
+  // keiner, kommt Post vom aktuellen, und der Kontakt muss dich neu hinzufuegen.
+  const oldest = keep.length ? b64urlEncode(keep[keep.length - 1].publicKeyRaw) : null;
+  for (const c of state.contacts) {
+    if (!c.mk || kept.has(c.mk)) continue;
+    if (oldest) c.mk = oldest; else delete c.mk;
+  }
   state.meta = Object.assign({}, state.meta, {
     prev: (state.meta.prev || []).filter((p) => kept.has(b64urlEncode(p.publicKeyRaw)))
   });
@@ -1292,7 +1317,7 @@ function toast(message, kind = 'ok', ms = 4200, action = null) {
   );
   if (action) node.appendChild(el('button', { type: 'button', onclick: action.onClick }, action.label));
   box.appendChild(node);
-  setTimeout(() => node.remove(), ms);
+  if (ms) setTimeout(() => node.remove(), ms);
 }
 
 function confirmDialog({ title, body, okLabel, onOk }) {
@@ -1334,7 +1359,8 @@ function registerServiceWorker() {
       if (!sw) return;
       sw.addEventListener('statechange', () => {
         if (sw.state === 'installed' && navigator.serviceWorker.controller) {
-          toast(t('toast.update'), 'warn', 12000, {
+          // Bleibt stehen: Bis zum Neuladen laeuft die alte Version weiter.
+          toast(t('toast.update'), 'warn', 0, {
             label: t('toast.reload'),
             onClick: () => { sw.postMessage({ type: 'SKIP_WAITING' }); location.reload(); }
           });

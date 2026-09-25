@@ -27,7 +27,7 @@ src/i18n.js                Deutsch / Englisch
 src/util.js                Base64, DOM-Fabrik ohne innerHTML, Animationen
 sw.js                      Offline-Betrieb
 _headers                   Security-Header für Cloudflare Pages
-test/crypto.test.mjs       47 Tests gegen den Krypto-Kern (bricht bei Fehlern mit Exit-Code 1 ab)
+test/crypto.test.mjs       52 Tests gegen den Krypto-Kern (bricht bei Fehlern mit Exit-Code 1 ab)
 ```
 
 ### Lokal starten
@@ -164,10 +164,19 @@ Payload.rk = neuer Public Key       (durch dh_s authentifiziert)
 ```
 
 Nur wer den bisherigen privaten Schlüssel besitzt, kann ein solches Update erzeugen —
-es ist dieselbe Authentifizierung wie bei jeder Nachricht. Die App des Empfängers
-übernimmt `rk` automatisch, **aber nur**, wenn die Nachricht vom *aktuellen* Schlüssel
-des Kontakts kommt. Ein wiedereingespieltes altes Update (Rollback) oder eines von einem
-Unbekannten ändert nichts. Der Prüfstatus („verifiziert“) bleibt erhalten, weil die
+es ist dieselbe Authentifizierung wie bei jeder Nachricht.
+
+Nach mehreren Wechseln reicht das nicht: Alice wechselt K1 → K2, Bob übernimmt K2, antwortet
+aber nicht. Alice wechselt erneut auf K3 und sendet weiter von K1 aus, weil sie nicht weiß,
+dass Bob K2 schon hat. Deshalb beglaubigen **alle** früheren Schlüssel, die Alice noch hat,
+den neuen mit (`ra`, je 16 Byte, gebildet wie `dh_s` über ECDH mit dem Empfänger).
+
+Die App des Empfängers übernimmt `rk` automatisch, **aber nur**, wenn genau der Schlüssel,
+den sie für den Kontakt gespeichert hat, das Update beglaubigt — als Absender oder per
+`ra`. Ein wiedereingespieltes altes Update (Rollback) ändert nichts, ebenso eines von einem
+Unbekannten oder von jemandem, der einen schon ausgemusterten Schlüssel erbeutet hat, etwa
+aus einer alten Sicherung. Hat der Empfänger die neue Kontaktkarte schon separat
+gespeichert, werden beide Einträge zusammengeführt, sofern der zweite ungeprüft ist. Der Prüfstatus („verifiziert“) bleibt erhalten, weil die
 Kette vom verifizierten Schlüssel aus beglaubigt ist; Kontaktdetail und Entschlüsseln-
 Ansicht zeigen den Wechsel aber sichtbar an. Wer nicht warten will, erzeugt im
 Kontaktdetail gezielt eine „Update-Nachricht“.
@@ -191,7 +200,8 @@ das Zeitfenster. Zwei Punkte gehören dazu:
 - Alte **Sicherungsdateien** enthalten alte Schlüssel. Nach einem Wechsel eine neue
   Sicherung exportieren und die alten löschen.
 - Wer das Update bis zum Löschen nicht erhalten hat, muss dich neu hinzufügen und den
-  Fingerabdruck erneut vergleichen.
+  Fingerabdruck erneut vergleichen. Solange noch irgendein früherer Schlüssel existiert,
+  sendet die App von diesem aus.
 
 ### Fingerabdruck und Siegel
 
