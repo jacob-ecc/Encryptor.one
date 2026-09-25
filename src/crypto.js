@@ -36,6 +36,11 @@
 //   m   Text
 //   rk  optional: neuer Public Key des Absenders (Schluesselwechsel). Authentifiziert
 //       durch dh_s mit dem bisherigen Schluessel — nur dessen Besitzer kann ihn setzen.
+//   ra  optional: Beglaubigungen von rk durch weitere fruehere Schluessel des Absenders,
+//       je 16 Byte: HKDF(ECDH(frueher, empfaenger), salt, "…/endorse" || frueher || rk || empf).
+//       Noetig nach mehreren Wechseln: Der Empfaenger kennt vielleicht schon einen
+//       neueren Schluessel als den, von dem die Nachricht ausgeht, und uebernimmt ein
+//       Update nur, wenn genau dieser es beglaubigt.
 //   p   Fuellzeichen. Die Laenge landet auf festen Stufen (mind. 256 Byte, darueber
 //       Padme), damit der Chiffretext nicht die exakte Textlaenge verraet.
 // Aeltere Versionen ignorieren rk und p, das Format bleibt kompatibel.
@@ -54,6 +59,8 @@ const MAX_BODY = 4_000_000;
 const MIN_PAYLOAD = 256;
 const HDR_INFO = enc.encode('encryptor.one/v1/hdr');
 const BODY_INFO = enc.encode('encryptor.one/v1/body');
+const ENDORSE_INFO = enc.encode('encryptor.one/v1/endorse');
+const MAX_ENDORSE = 8;
 
 export const KDF_ITERATIONS = 600_000;
 export const MSG_PREFIX = 'ENC1.';
@@ -196,7 +203,14 @@ function encodePayload(obj) {
   return enc.encode(json.slice(0, -1) + ',"p":"' + ' '.repeat(fill) + '"}');
 }
 
-export async function encryptMessage({ text, senderPrivateKey, senderPublicKeyRaw, recipientPublicKeyRaw, rotateTo = null }) {
+/** Beglaubigung: nur Inhaber von `endorser` oder Empfaenger koennen sie bilden (wie dh_s). */
+async function endorsementTag(dh, salt, endorserRaw, newKeyRaw, recipientRaw) {
+  return hkdf(dh, salt, concat(ENDORSE_INFO, endorserRaw, newKeyRaw, recipientRaw), 128);
+}
+
+export async function encryptMessage({
+  text, senderPrivateKey, senderPublicKeyRaw, recipientPublicKeyRaw, rotateTo = null, endorsers = []
+}) {
   const recipientPub = await importPublicRaw(recipientPublicKeyRaw);
 
   const eph = await subtle.generateKey(ECDH, true, ['deriveBits']);
@@ -210,7 +224,16 @@ export async function encryptMessage({ text, senderPrivateKey, senderPublicKeyRa
   const dhS = await ecdh(senderPrivateKey, recipientPub);
 
   const body0 = { v: 1, t: Date.now(), m: text };
-  if (rotateTo) body0.rk = b64urlEncode(rotateTo);
+  if (rotateTo) {
+    body0.rk = b64urlEncode(rotateTo);
+    const tags = [];
+    for (const e of endorsers.slice(0, MAX_ENDORSE)) {
+      const dh = await ecdh(e.privateKey, recipientPub);
+      tags.push(b64urlEncode(await endorsementTag(dh, salt, e.publicKeyRaw, rotateTo, recipientPublicKeyRaw)));
+      wipe(dh);
+    }
+    if (tags.length) body0.ra = tags;
+  }
   const payload = encodePayload(body0);
   const bodyLen = payload.length + 16; // AES-GCM haengt 16 Byte Tag an
   const lenField = Uint8Array.of(
@@ -301,13 +324,37 @@ export async function decryptMessage({ armored, keys, privateKey, publicKeyRaw }
   try { payload = JSON.parse(dec.decode(plain)); } catch { throw new CryptoError('tampered'); }
   wipe(plain);
 
+  const rotateTo = await readRotation(payload.rk, senderPublicKeyRaw);
+  const tags = rotateTo && Array.isArray(payload.ra)
+    ? payload.ra.slice(0, MAX_ENDORSE).filter((x) => typeof x === 'string' && x.length <= 32)
+    : [];
+
   return {
     text: typeof payload.m === 'string' ? payload.m : '',
     sentAt: Number.isFinite(payload.t) ? payload.t : null,
     senderPublicKeyRaw,
-    rotateTo: await readRotation(payload.rk, senderPublicKeyRaw),
+    rotateTo,
     keyIndex,
-    envelopeId: (await sha256(bytes)).slice(0, 12)
+    envelopeId: (await sha256(bytes)).slice(0, 12),
+    /**
+     * Hat `endorserRaw` den neuen Schluessel beglaubigt? Der Absender selbst ja (die ganze
+     * Nachricht ist mit ihm authentifiziert), jeder andere Schluessel nur mit gueltigem Tag.
+     */
+    async vouchedBy(endorserRaw) {
+      if (!rotateTo) return false;
+      if (equalBytes(endorserRaw, senderPublicKeyRaw)) return true;
+      if (!tags.length) return false;
+      let pub;
+      try { pub = await importPublicRaw(endorserRaw); } catch { return false; }
+      const dh = await ecdh(me.privateKey, pub);
+      const want = await endorsementTag(dh, salt, endorserRaw, rotateTo, me.publicKeyRaw);
+      wipe(dh);
+      let hit = false;
+      for (const t of tags) {
+        try { if (equalBytes(b64urlDecode(t), want)) hit = true; } catch { /* kaputter Tag */ }
+      }
+      return hit;
+    }
   };
 }
 

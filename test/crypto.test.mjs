@@ -237,6 +237,27 @@ const forged = await encryptMessage({ text: 'ich bin alice', senderPrivateKey: e
 const rf = await decryptMessage({ armored: forged, privateKey: bob.privateKey, publicKeyRaw: bob.publicKeyRaw });
 ok('Fremdes Update traegt Eves Absender, nicht Alices', same(rf.senderPublicKeyRaw, eve.publicKeyRaw));
 
+console.log('\n--- Mehrere Wechsel (Beglaubigung) ---');
+// Alice: K1 -> K2 -> K3. Bob hat K2 schon gespeichert, die Nachricht kommt aber noch von K1.
+const alice3 = await createIdentity(A.wrapKey);
+const k1 = { privateKey: alice.privateKey, publicKeyRaw: alice.publicKeyRaw };
+const k2 = { privateKey: alice2.privateKey, publicKeyRaw: alice2.publicKeyRaw };
+const dbl = await encryptMessage({ text: 'zwei Wechsel', senderPrivateKey: k1.privateKey,
+  senderPublicKeyRaw: k1.publicKeyRaw, recipientPublicKeyRaw: bob.publicKeyRaw,
+  rotateTo: alice3.publicKeyRaw, endorsers: [k2] });
+const rd = await decryptMessage({ armored: dbl, privateKey: bob.privateKey, publicKeyRaw: bob.publicKeyRaw });
+ok('Absender (K1) beglaubigt implizit', await rd.vouchedBy(k1.publicKeyRaw));
+ok('K2 beglaubigt per Tag', await rd.vouchedBy(k2.publicKeyRaw));
+ok('Unbeteiligter Schluessel beglaubigt nicht', !(await rd.vouchedBy(eve.publicKeyRaw)));
+
+// Ohne Beglaubigung durch K2 (z. B. altes Update wiedereingespielt) -> Bob mit K2 lehnt ab.
+const noTag = await encryptMessage({ text: 'x', senderPrivateKey: k1.privateKey,
+  senderPublicKeyRaw: k1.publicKeyRaw, recipientPublicKeyRaw: bob.publicKeyRaw, rotateTo: alice3.publicKeyRaw });
+ok('Update nur von K1 reicht nicht, wenn Bob schon K2 hat',
+  !(await (await decryptMessage({ armored: noTag, privateKey: bob.privateKey, publicKeyRaw: bob.publicKeyRaw })).vouchedBy(k2.publicKeyRaw)));
+
+ok('Normale Nachricht beglaubigt nichts', !(await out.vouchedBy(alice.publicKeyRaw)));
+
 console.log('\n--- Zufall ---');
 const counts = new Array(130).fill(0);
 for (let i = 0; i < 130000; i++) counts[randomInt(130)]++;
