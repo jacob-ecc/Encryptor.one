@@ -2,7 +2,7 @@
 // Installieren gecacht, danach cache-first ausgeliefert. Neue Versionen
 // bekommen einen neuen Cache-Namen; alte werden beim Aktivieren entfernt.
 
-const CACHE = 'encryptor-one-v2.0.0';
+const CACHE = 'encryptor-one-v2.1.0';
 const ASSETS = [
   '/',
   '/index.html',
@@ -19,7 +19,11 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));
+  // cache: 'reload' umgeht den HTTP-Cache. Sonst koennte eine neue Version alte Dateien
+  // einsammeln — /assets/* darf laut _headers eine Woche im Browser-Cache liegen.
+  event.waitUntil(caches.open(CACHE).then((c) =>
+    c.addAll(ASSETS.map((url) => new Request(url, { cache: 'reload' })))
+  ));
 });
 
 self.addEventListener('activate', (event) => {

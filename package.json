@@ -1,6 +1,6 @@
 {
   "name": "encryptor-one",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "type": "module",
   "description": "Ende-zu-Ende-Verschlüsselung im Browser. Kein Build-Schritt, keine Abhängigkeiten.",

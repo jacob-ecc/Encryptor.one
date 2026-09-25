@@ -43,7 +43,8 @@ export const idb = {
 };
 
 /* ---------------- Datensätze ---------------- */
-// meta     { v, createdAt, kdf:{iterations, salt:Uint8Array}, publicKeyRaw, wrapped, iv }
+// meta     { v, createdAt, kdf:{iterations, salt:Uint8Array}, publicKeyRaw, wrapped, iv,
+//            prev:[{ publicKeyRaw, wrapped, iv, createdAt, retiredAt }] }
 // data     { iv:Uint8Array, ct:Uint8Array }  → { contacts:[], seen:[], settings:{} }
 
 export const hasVault = async () => !!(await idb.get('meta'));
@@ -51,6 +52,16 @@ export const readMeta = () => idb.get('meta');
 export const writeMeta = (meta) => idb.set('meta', meta);
 export const readData = () => idb.get('data');
 export const writeData = (rec) => idb.set('data', rec);
+
+/**
+ * Schreibt meta und data in einer Transaktion. Beim Passphrasen- oder Schluesselwechsel
+ * haengen beide voneinander ab: ein Absturz dazwischen darf keinen Vault hinterlassen,
+ * dessen Kontakte mit einem Schluessel versiegelt sind, den es nicht mehr gibt.
+ */
+export const writeVault = (meta, data) => tx('readwrite', (s) => {
+  s.put(meta, 'meta');
+  return s.put(data, 'data');
+});
 
 export async function destroyVault() {
   await idb.clear();
