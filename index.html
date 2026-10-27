@@ -10,11 +10,12 @@
 <meta name="description" content="Ende-zu-Ende-Verschlüsselung direkt im Browser. Schlüssel bleiben auf deinem Gerät, der Chiffretext geht über den Messenger deiner Wahl.">
 <meta name="referrer" content="no-referrer">
 <meta name="color-scheme" content="dark light">
-<meta name="theme-color" content="#061420" media="(prefers-color-scheme: dark)">
-<meta name="theme-color" content="#E8EFF5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0C0B0A" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F4F4F2" media="(prefers-color-scheme: light)">
 <link rel="icon" href="/assets/seal.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/assets/seal.svg">
 <link rel="manifest" href="/manifest.webmanifest">
+<link rel="preload" href="/assets/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/styles.css">
 <script src="/src/boot.js"></script>
 </head>
@@ -128,46 +129,93 @@
 <main id="main">
 
   <!-- ============ LANDING ============ -->
-  <section id="screen-landing" class="screen">
-    <div class="hero">
-      <div class="hero-seal" id="heroSeal" aria-hidden="true"></div>
-      <p class="eyebrow" data-i18n="landing.eyebrow"></p>
-      <h1 class="hero-title" id="heroTitle" data-i18n="landing.title"></h1>
-      <p class="hero-tagline mono" data-i18n="app.tagline"></p>
-      <p class="lede" data-i18n="landing.lede"></p>
-      <div class="hero-actions">
-        <button type="button" id="btnCreate" class="btn btn-primary btn-lg" data-i18n="landing.cta.create"></button>
-        <button type="button" id="btnHow" class="btn btn-quiet btn-lg" data-i18n="landing.cta.how"></button>
+  <section id="screen-landing" class="screen landing">
+    <div class="hero wrap">
+      <div class="hero-copy">
+        <h1 class="hero-title" id="heroTitle" data-i18n="landing.title"></h1>
+        <p class="lede" data-i18n="landing.lede"></p>
+        <div class="hero-actions">
+          <button type="button" id="btnCreate" class="btn btn-primary btn-lg" data-i18n="landing.cta.create"></button>
+          <button type="button" id="btnHow" class="btn btn-quiet btn-lg" data-i18n="landing.cta.how"></button>
+        </div>
+        <p class="hero-claims" data-i18n="landing.eyebrow"></p>
+        <p class="hero-note"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-shield"/></svg><span data-i18n="landing.offline"></span></p>
+        <button type="button" id="btnRestoreLanding" class="linklike linklike-quiet" data-i18n="unlock.restore"></button>
       </div>
-      <p class="hero-note"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-shield"/></svg><span data-i18n="landing.offline"></span></p>
-      <button type="button" id="btnRestoreLanding" class="linklike linklike-quiet" data-i18n="unlock.restore"></button>
+      <figure class="hero-seal-fig">
+        <div class="hero-seal" id="heroSeal" aria-hidden="true"></div>
+        <figcaption>
+          <span data-i18n="landing.seal.caption"></span>
+          <button type="button" id="btnReseal" class="btn btn-quiet btn-small">
+            <svg class="icon icon-sm" aria-hidden="true"><use href="#i-refresh"/></svg><span data-i18n="landing.seal.again"></span>
+          </button>
+        </figcaption>
+      </figure>
     </div>
 
-    <div class="facts">
-      <article class="fact">
-        <svg class="icon" aria-hidden="true"><use href="#i-key"/></svg>
-        <h3 data-i18n="landing.f1.t"></h3><p data-i18n="landing.f1.d"></p>
-      </article>
-      <article class="fact">
-        <svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg>
-        <h3 data-i18n="landing.f2.t"></h3><p data-i18n="landing.f2.d"></p>
-      </article>
-      <article class="fact">
-        <svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg>
-        <h3 data-i18n="landing.f3.t"></h3><p data-i18n="landing.f3.d"></p>
-      </article>
+    <section class="band band-paper" aria-labelledby="ideaTitle">
+      <div class="idea wrap">
+        <figure class="idea-fig" data-reveal>
+          <img src="/assets/img/matrix-and-impression.jpg" width="1400" height="1021" loading="lazy" decoding="async"
+               data-i18n-alt="landing.idea.alt" alt="">
+          <figcaption class="page-figcaption" data-i18n="landing.idea.caption"></figcaption>
+        </figure>
+        <div class="idea-copy" data-reveal>
+          <h2 class="page-h2" id="ideaTitle" data-i18n="landing.idea.title"></h2>
+          <p class="lede" data-i18n="landing.idea.body"></p>
+          <ul class="facts">
+            <li class="fact"><h3 data-i18n="landing.f1.t"></h3><p data-i18n="landing.f1.d"></p></li>
+            <li class="fact"><h3 data-i18n="landing.f2.t"></h3><p data-i18n="landing.f2.d"></p></li>
+            <li class="fact"><h3 data-i18n="landing.f3.t"></h3><p data-i18n="landing.f3.d"></p></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <div class="guide-band wrap">
+      <figure class="guide-fig" data-reveal>
+        <img src="/assets/img/sealing-a-letter.jpg" width="900" height="1095" loading="lazy" decoding="async"
+             data-i18n-alt="landing.guide.alt" alt="">
+        <figcaption class="page-figcaption" data-i18n="landing.guide.caption"></figcaption>
+      </figure>
+      <div id="howtoSlotLanding" class="howto-slot" data-reveal></div>
     </div>
 
-    <div id="howtoSlotLanding" class="howto-slot"></div>
+    <div class="sec-band wrap">
+      <div id="securitySlotLanding" class="howto-slot" data-reveal></div>
+      <figure class="sec-fig" data-reveal>
+        <img src="/assets/img/broken-seal.jpg" width="1100" height="1022" loading="lazy" decoding="async"
+             data-i18n-alt="landing.sec.alt" alt="">
+        <figcaption class="page-figcaption" data-i18n="landing.sec.caption"></figcaption>
+      </figure>
+    </div>
 
-    <div id="securitySlotLanding" class="howto-slot"></div>
+    <section class="band band-close" aria-labelledby="closeTitle">
+      <div class="close wrap">
+        <div class="close-copy" data-reveal>
+          <h2 class="page-h2" id="closeTitle" data-i18n="landing.close.title"></h2>
+          <p class="lede" data-i18n="landing.close.body"></p>
+          <button type="button" id="btnCreateClose" class="btn btn-primary btn-lg" data-i18n="landing.cta.create"></button>
+        </div>
+        <figure class="close-fig" data-reveal>
+          <img src="/assets/img/round-matrix.jpg" width="1000" height="995" loading="lazy" decoding="async"
+               data-i18n-alt="landing.close.alt" alt="">
+          <figcaption class="page-figcaption" data-i18n="landing.close.caption"></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <footer class="site-foot wrap">
+      <p class="foot-name" aria-hidden="true">encryptor<i>.one</i></p>
+      <p class="credits" data-i18n="landing.credits"></p>
+    </footer>
   </section>
 
   <!-- ============ UNLOCK ============ -->
   <section id="screen-lock" class="screen" hidden>
     <div class="panel panel-narrow lock-panel">
       <div class="lock-seal" id="lockSeal" aria-hidden="true"></div>
-      <h2 class="panel-title" data-i18n="unlock.title"></h2>
+      <h1 class="panel-title" data-i18n="unlock.title"></h1>
       <p class="muted" data-i18n="unlock.sub"></p>
       <form id="unlockForm" class="stack" novalidate>
         <div class="field">
@@ -237,7 +285,7 @@
 
       <div class="panel result-panel" id="encResult" hidden>
         <div class="result-head">
-          <p class="eyebrow" data-i18n="enc.result"></p>
+          <h2 class="panel-title" data-i18n="enc.result"></h2>
           <p class="result-status" id="encStatus"></p>
         </div>
         <textarea id="cipherOutput" class="input textarea mono cipher" rows="5" readonly></textarea>
@@ -270,10 +318,10 @@
       </div>
 
       <div class="panel result-panel" id="decResult" hidden>
-        <p class="eyebrow" data-i18n="dec.from"></p>
+        <h2 class="panel-title" data-i18n="dec.from"></h2>
         <div class="sender" id="decSender"></div>
         <p class="callout callout-info" id="decNotice" hidden><svg class="icon icon-sm" aria-hidden="true"><use href="#i-refresh"/></svg><span id="decNoticeText"></span></p>
-        <p class="eyebrow" data-i18n="dec.plain"></p>
+        <h2 class="panel-title" data-i18n="dec.plain"></h2>
         <div class="plain-out" id="plainOutput"></div>
         <p class="hint" id="decMeta"></p>
         <div class="btn-row">
@@ -288,7 +336,7 @@
     <!-- ---- Kontakte ---- -->
     <div class="view" id="view-contacts" hidden>
       <div class="panel identity-panel">
-        <p class="eyebrow" data-i18n="con.you"></p>
+        <h2 class="panel-title" data-i18n="con.you"></h2>
         <div class="identity">
           <div class="identity-seal" id="mySeal"></div>
           <div class="identity-body">
@@ -311,8 +359,8 @@
 
       <div class="panel">
         <div class="panel-head">
-          <p class="eyebrow" data-i18n="con.list"></p>
-          <button type="button" id="btnAddContact" class="btn btn-small btn-primary">
+          <h2 class="panel-title" data-i18n="con.list"></h2>
+          <button type="button" id="btnAddContact" class="btn btn-small btn-quiet">
             <svg class="icon icon-sm" aria-hidden="true"><use href="#i-plus"/></svg><span data-i18n="con.add"></span>
           </button>
         </div>
@@ -332,7 +380,7 @@
 <!-- ============ Bausteine, die zwischen Landing und Tab wandern ============ -->
 <div id="componentStore" hidden>
 <div id="howto" class="panel howto">
-  <p class="eyebrow" data-i18n="guide.title"></p>
+  <h2 class="panel-title" data-i18n="guide.title"></h2>
   <p class="lede lede-sm" data-i18n="guide.lede"></p>
 
   <ol class="steps" id="steps">
@@ -460,7 +508,7 @@
 
 <!-- ============ Sicherheitshinweise ============ -->
 <div id="securityNote" class="panel security">
-  <p class="eyebrow" data-i18n="sec.title"></p>
+  <h2 class="panel-title" data-i18n="sec.title"></h2>
   <div class="sec-grid">
     <div>
       <h3 class="sec-h sec-yes"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-check"/></svg><span data-i18n="sec.does"></span></h3>
@@ -475,7 +523,15 @@
       </ul>
     </div>
   </div>
-  <p class="stack-line mono" data-i18n="sec.stack"></p>
+  <div class="spec">
+    <h3 class="spec-title" data-i18n="sec.spec.title"></h3>
+    <dl>
+      <div class="spec-row"><dt data-i18n="sec.spec.kex"></dt><dd><code>ECDH, P-256</code></dd></div>
+      <div class="spec-row"><dt data-i18n="sec.spec.kdf"></dt><dd><code>HKDF-SHA-256</code></dd></div>
+      <div class="spec-row"><dt data-i18n="sec.spec.aead"></dt><dd><code>AES-256-GCM</code></dd></div>
+      <div class="spec-row"><dt data-i18n="sec.spec.pass"></dt><dd><code data-i18n="sec.spec.passv"></code></dd></div>
+    </dl>
+  </div>
 </div>
 
 </div><!-- /componentStore -->
@@ -578,11 +634,11 @@
       </select>
       <p class="hint" data-i18n="set.autolock.hint"></p>
     </section>
-    <hr class="rule">
+    <hr class="rule"><!-- taste-skill-ignore: App-Einstellungen -->
     <section class="setting">
       <p class="label" data-i18n="set.keys"></p>
       <p class="hint" data-i18n="set.keys.hint"></p>
-      <p class="hint mono" id="keyInfo"></p>
+      <p class="hint" id="keyInfo"></p>
       <button type="button" id="btnRotate" class="btn btn-quiet btn-block">
         <svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg><span data-i18n="set.keys.rotate"></span>
       </button>
@@ -598,7 +654,7 @@
         <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg><span data-i18n="set.keys.drop"></span>
       </button>
     </section>
-    <hr class="rule">
+    <hr class="rule"><!-- taste-skill-ignore: App-Einstellungen -->
     <section class="setting">
       <p class="label" data-i18n="set.backup"></p>
       <p class="hint" data-i18n="set.backup.hint"></p>
@@ -612,7 +668,7 @@
       </div>
       <textarea id="backupOut" class="input textarea mono cipher" rows="4" readonly hidden></textarea>
     </section>
-    <hr class="rule">
+    <hr class="rule"><!-- taste-skill-ignore: App-Einstellungen -->
     <section class="setting">
       <p class="label" data-i18n="set.pass"></p>
       <form id="passForm" class="stack" novalidate>
@@ -624,7 +680,7 @@
         <button type="submit" class="btn btn-quiet btn-block" data-i18n="set.pass"></button>
       </form>
     </section>
-    <hr class="rule">
+    <hr class="rule"><!-- taste-skill-ignore: App-Einstellungen -->
     <section class="setting">
       <button type="button" id="btnLockNow" class="btn btn-quiet btn-block">
         <svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg><span data-i18n="set.lockNow"></span>
@@ -633,7 +689,7 @@
     <section class="setting">
       <p class="version-row"><span data-i18n="set.version"></span> <span class="mono" id="appVersion"></span></p>
     </section>
-    <hr class="rule">
+    <hr class="rule"><!-- taste-skill-ignore: App-Einstellungen -->
     <section class="setting danger">
       <p class="label" data-i18n="set.danger"></p>
       <p class="hint" data-i18n="set.danger.hint"></p>

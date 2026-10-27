@@ -22,7 +22,7 @@ const de = {
   'action.theme': 'Erscheinung wechseln',
 
   'landing.eyebrow': 'Kein Konto · Kein Server · Kein Tracking',
-  'landing.title': 'Nachrichten, die nur ihr beide lesen könnt.',
+  'landing.title': 'Nur ihr beide könnt es lesen.',
   'landing.lede': 'encryptor.one verschlüsselt Text direkt in deinem Browser. Den fertigen Block schickst du über WhatsApp, Signal, E-Mail oder Papier — der Weg ist egal, denn unterwegs ist er unlesbar.',
   'landing.cta.create': 'Identität erstellen',
   'landing.cta.how': 'So funktioniert’s',
@@ -34,6 +34,21 @@ const de = {
   'landing.f3.t': 'Absender im Umschlag',
   'landing.f3.d': 'Wer den Chiffretext abfängt, sieht weder Inhalt noch Absender — die Absenderkennung liegt selbst verschlüsselt im Umschlag.',
   'landing.offline': 'Einmal geladen, funktioniert die App offline. Du kannst die Verbindung trennen und trotzdem weiterarbeiten.',
+  'landing.seal.caption': 'Dieses Siegel wurde gerade aus einem frischen Schlüssel berechnet. Jeder Schlüssel ergibt ein anderes, daran erkennt ihr euch gegenseitig.',
+  'landing.seal.again': 'Anderen Schlüssel ausprobieren',
+  'landing.idea.title': 'Der Stempel bleibt bei dir.',
+  'landing.idea.body': 'Früher blieb der Siegelstempel beim Absender, nur sein Abdruck reiste mit dem Brief. encryptor.one arbeitet genauso: Dein privater Schlüssel ist der Stempel und verlässt dieses Gerät nie. Der öffentliche Schlüssel ist der Abdruck, den darf jeder sehen.',
+  'landing.idea.alt': 'Ein Siegelabdruck in rotem Wachs neben dem bronzenen Stempel, mit dem er gemacht wurde. Beide zeigen einen schreibenden Heiligen unter Sternen.',
+  'landing.idea.caption': 'Abdruck in Wachs und Siegelstempel aus Bronze, im Stil des 13. Jahrhunderts. The Metropolitan Museum of Art.',
+  'landing.guide.alt': 'Kupferstich: Eine Frau an einem Tisch hält einen Brief, ein Diener reicht ihr eine brennende Kerze, um das Siegelwachs zu schmelzen.',
+  'landing.guide.caption': 'Einen Brief versiegeln. Kupferstich von Étienne Fessard nach Jean Siméon Chardin, 1738. Art Institute of Chicago.',
+  'landing.sec.alt': 'Ein dunkelrotes Wachssiegel auf einem Brief, quer durchgebrochen.',
+  'landing.sec.caption': 'Ein gebrochenes Siegel, Reval 1855. AES-GCM leistet dasselbe digital: Jede Änderung am Chiffretext fällt beim Entschlüsseln auf.',
+  'landing.close.title': 'Leg dein eigenes Siegel an.',
+  'landing.close.body': 'Eine Passphrase genügt. Daraus entsteht deine Identität, mit eigenem Schlüsselpaar und eigenem Siegel, und alles bleibt auf diesem Gerät.',
+  'landing.close.alt': 'Runder Siegelstempel aus Metall mit umlaufender Inschrift. In der Mitte kniet eine Figur vor einer Kapelle, darüber schwebt ein Engel.',
+  'landing.close.caption': 'Siegelstempel, 14. Jahrhundert. The Metropolitan Museum of Art.',
+  'landing.credits': 'Bilder: The Metropolitan Museum of Art (CC0) über Wikimedia Commons, ein gemeinfreies Siegel von Wikimedia Commons und ein gemeinfreier Kupferstich des Art Institute of Chicago. Schrift: Geist, SIL Open Font License.',
 
   'setup.title': 'Identität erstellen',
   'setup.intro': 'Wir erzeugen jetzt dein Schlüsselpaar. Die Passphrase verschlüsselt den privaten Schlüssel auf diesem Gerät — sie wird nirgendwo gespeichert und nirgendwo übertragen.',
@@ -146,7 +161,7 @@ const de = {
   'guide.next': 'Weiter',
   'guide.step': 'Schritt {n} von 5',
 
-  'sec.title': 'Was das schützt — und was nicht',
+  'sec.title': 'Was die App schützt und was nicht',
   'sec.does': 'Das leistet die App',
   'sec.d1': 'Inhalt und Integrität: Niemand auf dem Transportweg kann mitlesen oder unbemerkt etwas ändern — auch der Messenger-Betreiber nicht.',
   'sec.d2': 'Absender-Echtheit: Nur wer den privaten Schlüssel des Absenders besitzt, kann eine Nachricht erzeugen, die deine App ihm zuordnet. Einen Beweis gegenüber Dritten liefert das bewusst nicht.',
@@ -157,6 +172,12 @@ const de = {
   'sec.n3': 'Vollständige Vorwärtssicherheit: Der ephemere Schlüssel schützt die Senderseite. Wer den Schlüssel des Empfängers erbeutet, kann an ihn gerichtete Nachrichten lesen, solange dieser Schlüssel existiert. Ein regelmäßiger Schlüsselwechsel begrenzt dieses Fenster; lückenlos wäre erst ein Ratchet-Protokoll wie in Signal.',
   'sec.n4': 'Der Empfänger selbst: Er kann den Klartext kopieren, abfotografieren und weitergeben.',
   'sec.stack': 'Verfahren: ECDH auf P-256 · HKDF-SHA-256 · AES-256-GCM · PBKDF2-SHA-256 mit 600.000 Runden',
+  'sec.spec.title': 'Verfahren',
+  'sec.spec.kex': 'Schlüsseltausch',
+  'sec.spec.kdf': 'Schlüsselableitung',
+  'sec.spec.aead': 'Verschlüsselung',
+  'sec.spec.pass': 'Schutz der Passphrase',
+  'sec.spec.passv': 'PBKDF2-SHA-256, 600.000 Runden',
 
   'set.title': 'Einstellungen',
   'set.appearance': 'Erscheinung',
@@ -247,7 +268,7 @@ const en = {
   'action.theme': 'Switch appearance',
 
   'landing.eyebrow': 'No account · No server · No tracking',
-  'landing.title': 'Messages only the two of you can read.',
+  'landing.title': 'Only the two of you can read it.',
   'landing.lede': 'encryptor.one encrypts text right in your browser. Send the finished block over WhatsApp, Signal, email or paper — the route does not matter, because in transit it is unreadable.',
   'landing.cta.create': 'Create identity',
   'landing.cta.how': 'How it works',
@@ -259,6 +280,21 @@ const en = {
   'landing.f3.t': 'Sender inside the envelope',
   'landing.f3.d': 'Anyone intercepting the ciphertext sees neither the content nor who sent it — the sender identity is itself encrypted.',
   'landing.offline': 'Once loaded, the app works offline. You can disconnect and keep working.',
+  'landing.seal.caption': 'This seal was just computed from a fresh key. Every key gives a different one, which is how you recognise each other.',
+  'landing.seal.again': 'Try another key',
+  'landing.idea.title': 'The stamp stays with you.',
+  'landing.idea.body': 'The seal stamp used to stay with the sender; only its impression travelled with the letter. encryptor.one works the same way: your private key is the stamp and never leaves this device. The public key is the impression, and anyone may see it.',
+  'landing.idea.alt': 'A seal impression in red wax beside the bronze stamp that made it. Both show a writing saint beneath stars.',
+  'landing.idea.caption': 'Wax impression and bronze seal matrix in 13th-century style. The Metropolitan Museum of Art.',
+  'landing.guide.alt': 'Engraving: a woman at a table holds a letter while a servant hands her a lit candle to melt the sealing wax.',
+  'landing.guide.caption': 'Sealing a letter. Engraving by Étienne Fessard after Jean Siméon Chardin, 1738. Art Institute of Chicago.',
+  'landing.sec.alt': 'A dark red wax seal on a letter, broken across.',
+  'landing.sec.caption': 'A broken seal, Reval 1855. AES-GCM does the same digitally: any change to the ciphertext shows up on decryption.',
+  'landing.close.title': 'Make a seal of your own.',
+  'landing.close.body': 'A passphrase is all it takes. It becomes your identity, with its own key pair and its own seal, and everything stays on this device.',
+  'landing.close.alt': 'Round metal seal matrix with an inscription around the edge. In the centre a figure kneels before a chapel beneath a hovering angel.',
+  'landing.close.caption': 'Seal matrix, 14th century. The Metropolitan Museum of Art.',
+  'landing.credits': 'Images: The Metropolitan Museum of Art (CC0) via Wikimedia Commons, a public-domain seal from Wikimedia Commons and a public-domain engraving from the Art Institute of Chicago. Typeface: Geist, SIL Open Font License.',
 
   'setup.title': 'Create identity',
   'setup.intro': 'We will now generate your key pair. The passphrase encrypts the private key on this device — it is never stored and never transmitted.',
@@ -371,7 +407,7 @@ const en = {
   'guide.next': 'Next',
   'guide.step': 'Step {n} of 5',
 
-  'sec.title': 'What this protects — and what it does not',
+  'sec.title': 'What it protects and what it does not',
   'sec.does': 'What it does',
   'sec.d1': 'Content and integrity: nobody along the route can read along or change anything unnoticed — including the messenger operator.',
   'sec.d2': 'Sender authenticity: only someone holding the sender’s private key can produce a message your app attributes to them. By design this is not proof towards third parties.',
@@ -382,6 +418,12 @@ const en = {
   'sec.n3': 'Full forward secrecy: the ephemeral key protects the sender side. Whoever obtains the recipient’s key can read messages sent to it for as long as that key exists. Rotating keys regularly narrows that window; closing it completely would need a ratchet protocol like Signal’s.',
   'sec.n4': 'The recipient: they can copy, photograph and forward the plaintext.',
   'sec.stack': 'Primitives: ECDH on P-256 · HKDF-SHA-256 · AES-256-GCM · PBKDF2-SHA-256 at 600,000 rounds',
+  'sec.spec.title': 'Primitives',
+  'sec.spec.kex': 'Key agreement',
+  'sec.spec.kdf': 'Key derivation',
+  'sec.spec.aead': 'Encryption',
+  'sec.spec.pass': 'Passphrase hardening',
+  'sec.spec.passv': 'PBKDF2-SHA-256, 600,000 rounds',
 
   'set.title': 'Settings',
   'set.appearance': 'Appearance',
@@ -487,7 +529,8 @@ export function t(key, vars) {
 const ATTR_MAP = {
   'i18nPlaceholder': 'placeholder',
   'i18nTitle': 'title',
-  'i18nLabel': 'aria-label'
+  'i18nLabel': 'aria-label',
+  'i18nAlt': 'alt'
 };
 
 export function applyI18n(root = document) {
