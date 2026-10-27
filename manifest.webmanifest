@@ -7,8 +7,8 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#061420",
-  "theme_color": "#061420",
+  "background_color": "#0C0B0A",
+  "theme_color": "#0C0B0A",
   "categories": ["utilities", "security"],
   "icons": [
     { "src": "/assets/seal.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },

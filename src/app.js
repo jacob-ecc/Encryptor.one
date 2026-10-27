@@ -14,7 +14,7 @@ import { readMeta, readData, writeData, writeVault, hasVault, destroyVault, pref
 import { t, setLang, getLang, detectLang, WORDS } from './i18n.js';
 import { sigil } from './sigil.js';
 
-const VERSION = '2.1.1';
+const VERSION = '2.2.0';
 const MAX_MESSAGE = 20000;
 const DAY = 86400000;
 const DEFAULT_SETTINGS = { autolock: 15, keepOld: 30 };
@@ -102,7 +102,9 @@ function readInviteFromUrl() {
 }
 
 function updateLandingCta(vaultExists) {
-  $('#btnCreate').textContent = vaultExists ? t('landing.cta.unlock') : t('landing.cta.create');
+  const label = vaultExists ? t('landing.cta.unlock') : t('landing.cta.create');
+  $('#btnCreate').textContent = label;
+  $('#btnCreateClose').textContent = label;
 }
 
 /* ================= Rahmen: Theme, Sprache, Screens ================= */
@@ -147,6 +149,9 @@ function wireChrome() {
   $('#btnHow').addEventListener('click', () => {
     $('#howto').scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' });
   });
+  $('#btnCreateClose').addEventListener('click', () => $('#btnCreate').click());
+  $('#btnReseal').addEventListener('click', renderHeroSeal);
+  wireReveal();
 
   wireSetup();
   wireUnlock();
@@ -475,6 +480,21 @@ async function renderHeroSeal() {
   const box = $('#heroSeal');
   clear(box);
   box.appendChild(sigil(demo, { size: 148, animate: true }));
+}
+
+// Startseite: Abschnitte blenden beim Hineinscrollen ein. Ohne Observer (oder bei
+// reduzierter Bewegung) bleibt alles sichtbar — versteckt wird erst über .reveal-on.
+function wireReveal() {
+  if (!('IntersectionObserver' in window) || prefersReducedMotion()) return;
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      e.target.classList.add('is-in');
+      io.unobserve(e.target);
+    }
+  }, { rootMargin: '0px 0px -12% 0px' });
+  for (const node of $$('[data-reveal]')) io.observe(node);
+  document.documentElement.classList.add('reveal-on');
 }
 
 async function renderLockSeal() {
