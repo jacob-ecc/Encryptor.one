@@ -274,7 +274,9 @@
           <!-- spellcheck aus: Chromes „erweiterte Rechtschreibprüfung“ und Edges Editor schicken
                getippten Text an Google bzw. Microsoft — bevor er verschlüsselt ist. -->
           <textarea id="plainInput" class="input textarea" rows="6" spellcheck="false" autocomplete="off"
-                    writingsuggestions="false" data-i18n-placeholder="enc.msg.ph"></textarea>
+                    autocorrect="off" writingsuggestions="false" data-gramm="false" data-gramm_editor="false"
+                    data-enable-grammarly="false" data-lt-active="false"
+                    data-i18n-placeholder="enc.msg.ph"></textarea>
           <p class="counter" id="plainCounter">0</p>
         </div>
         <button type="button" id="btnEncrypt" class="btn btn-primary btn-block">
@@ -587,7 +589,8 @@
     <div class="preview" id="contactPreview" hidden></div>
     <div class="field">
       <label class="label" for="contactName" data-i18n="con.add.name"></label>
-      <input type="text" id="contactName" class="input" maxlength="64" data-i18n-placeholder="con.add.name.ph">
+      <input type="text" id="contactName" class="input" maxlength="64" autocomplete="off" spellcheck="false"
+             data-i18n-placeholder="con.add.name.ph">
     </div>
     <p class="form-error" id="contactError" role="alert" hidden></p>
     <button type="submit" class="btn btn-primary btn-block" data-i18n="con.add.submit"></button>
@@ -676,6 +679,8 @@
                spellcheck="false" data-i18n-placeholder="set.pass.old">
         <input type="password" id="passNew" class="input" autocomplete="new-password" autocapitalize="off"
                spellcheck="false" data-i18n-placeholder="set.pass.new">
+        <input type="password" id="passNew2" class="input" autocomplete="new-password" autocapitalize="off"
+               spellcheck="false" data-i18n-placeholder="set.pass.new2">
         <p class="form-error" id="passError" role="alert" hidden></p>
         <button type="submit" class="btn btn-quiet btn-block" data-i18n="set.pass"></button>
       </form>

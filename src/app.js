@@ -2,7 +2,7 @@
 
 import {
   $, $$, el, clear, icon, copyText, b64urlEncode, b64urlDecode,
-  scrambleTo, formatDateTime, toHex, prefersReducedMotion, cleanName
+  scrambleTo, formatDateTime, toHex, prefersReducedMotion, cleanName, nameKey
 } from './util.js';
 import {
   CRYPTO_AVAILABLE, KDF_ITERATIONS, CryptoError,
@@ -14,7 +14,10 @@ import { readMeta, readData, writeData, writeVault, hasVault, destroyVault, pref
 import { t, setLang, getLang, detectLang, WORDS } from './i18n.js';
 import { sigil } from './sigil.js';
 
-const VERSION = '2.2.0';
+const VERSION = '2.3.0';
+// 10 aus 130 Woertern, gleichverteilt: log2(130) * 10 ≈ 70 Bit. Die Passphrase ist das
+// Einzige, was eine abgeflossene Sicherung schuetzt — 8 Woerter (≈ 56 Bit) waren dafuer knapp.
+const SUGGEST_WORDS = 10;
 const MAX_MESSAGE = 20000;
 const DAY = 86400000;
 const DEFAULT_SETTINGS = { autolock: 15, keepOld: 30 };
@@ -44,6 +47,7 @@ const state = {
 async function boot() {
   setLang(detectLang(), { persist: false });
   syncThemeButton();
+  wireConfirm();
   wireChrome();
   wireGuide();
   wireEncrypt();
@@ -214,7 +218,7 @@ function wireSetup() {
 
   $('#btnSuggestPass').addEventListener('click', async () => {
     const words = [];
-    for (let i = 0; i < 8; i++) words.push(WORDS[randomInt(WORDS.length)]);
+    for (let i = 0; i < SUGGEST_WORDS; i++) words.push(WORDS[randomInt(WORDS.length)]);
     const suggestion = words.join('-');
     $('#setupPass').value = suggestion;
     $('#setupPass2').value = suggestion;
@@ -396,6 +400,12 @@ function lock() {
   state.contacts = [];
   state.seen = [];
   state.lastCipher = '';
+  // Offene Dialoge liegen im Top Layer ueber dem Sperrbildschirm und bleiben bedienbar —
+  // Kontaktdetails, Einstellungen, halb ausgefuellte Formulare.
+  for (const dlg of $$('dialog')) if (dlg.open) dlg.close();
+  clear($('#detailBody'));
+  clear($('#contactPreview'));
+  for (const id of ['#contactInput', '#contactName', '#passOld', '#passNew', '#passNew2']) $(id).value = '';
   $('#plainInput').value = '';
   $('#cipherInput').value = '';
   $('#cipherOutput').value = '';
@@ -432,6 +442,8 @@ async function loadData() {
   if (!rec) { state.contacts = []; state.seen = []; return; }
   const data = await openJSON(state.dataKey, rec);
   state.contacts = Array.isArray(data.contacts) ? data.contacts : [];
+  // Namen aus aelteren Versionen koennen noch ein „✓“ enthalten (siehe cleanName).
+  for (const c of state.contacts) c.n = cleanName(c.n) || t('dec.unknown');
   state.seen = Array.isArray(data.seen) ? data.seen.slice(-300) : [];
   state.settings = Object.assign({ ...DEFAULT_SETTINGS }, data.settings || {});
 }
@@ -458,6 +470,12 @@ function contactByKey(b64) {
   return state.contacts.find((c) => c.k === b64)
     || state.contacts.find((c) => Array.isArray(c.pk) && c.pk.includes(b64))
     || null;
+}
+
+/** Zwei Kontakte gleichen Namens sind in der Empfaengerliste nicht zu unterscheiden. */
+function contactByName(name, except = null) {
+  const key = nameKey(name);
+  return state.contacts.find((c) => c !== except && nameKey(c.n) === key) || null;
 }
 
 async function contactVisual(c) {
@@ -563,7 +581,7 @@ async function doEncrypt() {
   const known = contact && contact.mk && state.prev.find((p) => b64urlEncode(p.publicKeyRaw) === contact.mk);
   if (known) {
     sender = known;
-    rotateTo = state.publicKeyRaw;
+    rotateTo = { publicKeyRaw: state.publicKeyRaw, privateKey: state.privateKey };
     endorsers = state.prev.filter((p) => p !== known);
   }
 
@@ -579,7 +597,11 @@ async function doEncrypt() {
         endorsers
       });
       state.lastCipher = armored;
-      $('#encStatus').textContent = t('enc.done', { name: recipientName }) + (rotateTo ? ' ' + t('rot.included') : '');
+      $('#encStatus').textContent = [
+        t('enc.done', { name: recipientName }),
+        rotateTo ? t('rot.included') : '',
+        contact && contact.v ? '' : t('enc.unverified')
+      ].filter(Boolean).join(' ');
       $('#encResult').hidden = false;
       await scrambleTo($('#cipherOutput'), armored, { duration: 620, max: 4000 });
       $('#encResult').scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'nearest' });
@@ -625,6 +647,11 @@ async function doDecrypt() {
 
       const shownKey = rotated ? res.rotateTo : res.senderPublicKeyRaw;
       const senderFp = await fingerprint(shownKey);
+      // Kam die Nachricht von einem frueheren Schluessel des Kontakts, gilt dessen Pruefung
+      // nicht: Wurde der Schluessel wegen eines Geraeteverlusts gewechselt, kann sie von
+      // jemand anderem stammen. Waehrend des Wechsels ist das normal — aber nie „verifiziert“.
+      const viaOldKey = !!known && !rotated && known.k !== senderB64;
+      const trusted = !!known && known.v && !viaOldKey;
 
       const box = $('#decSender');
       clear(box);
@@ -634,9 +661,9 @@ async function doDecrypt() {
         el('p', { class: 'contact-fp', text: senderFp.text })
       ));
       if (known) {
-        box.appendChild(el('span', { class: 'badge ' + (known.v ? 'badge-ok' : 'badge-warn') },
-          icon(known.v ? 'check' : 'alert', 'icon icon-sm'),
-          t(known.v ? 'con.verified' : 'con.unverified')
+        box.appendChild(el('span', { class: 'badge ' + (trusted ? 'badge-ok' : 'badge-warn') },
+          icon(trusted ? 'check' : 'alert', 'icon icon-sm'),
+          t(trusted ? 'con.verified' : viaOldKey ? 'con.oldKey' : 'con.unverified')
         ));
       } else {
         // Bringt die Nachricht einen neuen Schluessel mit, wird gleich dieser gespeichert —
@@ -665,7 +692,7 @@ async function doDecrypt() {
       if (res.sentAt) meta.push(`${t('dec.sentAt')}: ${formatDateTime(res.sentAt, getLang())}`);
       if (duplicate) meta.push(t('dec.dup'));
       if (!known) meta.push(t('dec.unknownHint'));
-      if (known && !rotated && known.k !== senderB64) meta.push(t('dec.theirOldKey'));
+      if (viaOldKey) meta.push(t('dec.theirOldKey'));
       if (res.keyIndex > 0) meta.push(t('dec.myOldKey'));
       $('#decMeta').textContent = meta.join(' · ');
 
@@ -690,13 +717,18 @@ function keyRing() {
  * den wir fuer ihn gespeichert haben, das Update beglaubigt. Kommt die Nachricht von
  * einem aelteren Schluessel, muss sie eine Beglaubigung des aktuellen mitbringen. So kann
  * weder ein wiedereingespieltes altes Update zurueckrollen, noch jemand, der einen
- * ausgemusterten Schluessel erbeutet hat, den Kontakt umlenken. Der Pruefstatus bleibt
- * erhalten: Die Kette beginnt beim bisherigen, geprueften Schluessel.
+ * ausgemusterten Schluessel erbeutet hat, den Kontakt umlenken.
+ *
+ * Der Pruefstatus faellt dabei zurueck auf „ungeprueft“ (wie bei Signal, wenn sich die
+ * Sicherheitsnummer aendert). Ein Wechsel ist genau dann noetig, wenn der alte Schluessel
+ * in falsche Haende geraten sein koennte — und wer ihn hat, kann ebenso ein Update auf
+ * seinen eigenen Schluessel beglaubigen. Nur ein erneuter Vergleich deckt das auf.
  */
 async function applyRotation(contact, res) {
   if (!res.rotateTo) return false;
   const next = b64urlEncode(res.rotateTo);
-  if (next === contact.k || next === b64urlEncode(state.publicKeyRaw)) return false;
+  if (next === contact.k) return false;
+  if (keyRing().some((k) => b64urlEncode(k.publicKeyRaw) === next)) return false; // einer unserer eigenen
   if ((contact.pk || []).includes(next)) return false; // kein Zurueckrollen
   if (!(await res.vouchedBy(b64urlDecode(contact.k)))) return false;
 
@@ -712,6 +744,7 @@ async function applyRotation(contact, res) {
   contact.pk = [contact.k, ...(contact.pk || [])].slice(0, 8);
   contact.k = next;
   contact.rt = Date.now();
+  contact.v = false;
   return true;
 }
 
@@ -740,6 +773,8 @@ function wireContacts() {
     if (existing) return showError(err, t('con.add.exists', { name: existing.n }));
 
     const name = cleanName($('#contactName').value) || parsed.name || t('dec.unknown');
+    const sameName = contactByName(name);
+    if (sameName) return showError(err, t('con.add.nameTaken', { name: sameName.n }));
     const entry = { id: toHex(randomBytes(8)), n: name, k: b64, v: false, t: Date.now() };
     // Stammt der Schluessel aus einem Update, bleibt der alte als Vorgaenger bekannt —
     // sonst erschiene die naechste Nachricht, die noch vom alten kommt, als Fremder.
@@ -757,7 +792,9 @@ function wireContacts() {
   });
 }
 
-function myCard() { return encodeContactCard(t('con.you'), state.publicKeyRaw); }
+// Ohne Namen: Die App kennt keinen, und „Deine Identität“ landete sonst beim Gegenueber
+// als vorgeschlagener Kontaktname.
+function myCard() { return encodeContactCard('', state.publicKeyRaw); }
 function myLink() {
   const base = location.origin && location.origin !== 'null' ? location.origin + location.pathname : 'https://encryptor.one/';
   return base + '#' + encodeContactCard('', state.publicKeyRaw);
@@ -878,9 +915,13 @@ async function openContactDetail(c) {
   const renameBtn = el('button', {
     class: 'btn btn-quiet', type: 'button',
     onclick: () => {
-      const field = el('input', { class: 'input', value: c.n, maxlength: 64 });
+      const field = el('input', { class: 'input', value: c.n, maxlength: 64, spellcheck: 'false', autocomplete: 'off' });
+      const fieldErr = el('p', { class: 'form-error', role: 'alert', hidden: true });
       const save = el('button', { class: 'btn btn-primary', type: 'button', onclick: async () => {
-        c.n = cleanName(field.value) || c.n;
+        const name = cleanName(field.value) || c.n;
+        const sameName = contactByName(name, c);
+        if (sameName) return showError(fieldErr, t('con.add.nameTaken', { name: sameName.n }));
+        c.n = name;
         state.contacts.sort((a, b) => a.n.localeCompare(b.n));
         await persistData();
         renderContacts();
@@ -890,6 +931,7 @@ async function openContactDetail(c) {
       clear(body);
       body.appendChild(el('div', { class: 'field' },
         el('label', { class: 'label', text: t('con.add.name') }), field));
+      body.appendChild(fieldErr);
       body.appendChild(el('div', { class: 'btn-row btn-row-end' }, save));
       field.focus();
     }
@@ -1208,6 +1250,8 @@ async function changePassphrase(e) {
   const oldPass = $('#passOld').value;
   const newPass = $('#passNew').value;
   if (newPass.length < 12) return showError(err, t('setup.tooweak'));
+  // Ein Tippfehler hier sperrt die Identitaet dauerhaft aus — also zweimal eingeben lassen.
+  if (newPass !== $('#passNew2').value) return showError(err, t('setup.nomatch'));
 
   const btn = e.target.querySelector('button[type="submit"]');
   await withBusy(btn, t('setup.working'), async () => {
@@ -1232,8 +1276,8 @@ async function changePassphrase(e) {
       state.meta = meta;
       state.wrapKey = newKeys.wrapKey;
       state.dataKey = newKeys.dataKey;
-      $('#passOld').value = $('#passNew').value = '';
-      toast(t('set.pass.done'));
+      $('#passOld').value = $('#passNew').value = $('#passNew2').value = '';
+      toast(t('set.pass.done'), 'ok', 9000);
     } catch {
       showError(err, t('set.backup.wrongpass'));
     }
@@ -1340,23 +1384,30 @@ function toast(message, kind = 'ok', ms = 4200, action = null) {
   if (ms) setTimeout(() => node.remove(), ms);
 }
 
+// Genau eine ausstehende Aktion. Frueher hing jeder Aufruf eigene Listener an den OK-Knopf
+// und entfernte sie nur ueber OK/Abbrechen — nach Escape oder Klick auf den Hintergrund
+// blieben sie haengen, und das naechste OK fuehrte die alte Aktion mit aus (z. B. „Alles
+// löschen“ beim Löschen eines Kontakts).
+let confirmAction = null;
+
+function wireConfirm() {
+  const dlg = $('#dlgConfirm');
+  $('#confirmOk').addEventListener('click', async () => {
+    const fn = confirmAction;
+    confirmAction = null;
+    dlg.close();
+    if (fn) await fn();
+  });
+  $('#confirmCancel').addEventListener('click', () => dlg.close());
+  dlg.addEventListener('close', () => { confirmAction = null; });
+}
+
 function confirmDialog({ title, body, okLabel, onOk }) {
   const dlg = $('#dlgConfirm');
   $('#confirmTitle').textContent = title;
   $('#confirmBody').textContent = body;
-  const ok = $('#confirmOk');
-  ok.textContent = okLabel;
-  const cancel = $('#confirmCancel');
-
-  const cleanup = () => {
-    ok.removeEventListener('click', accept);
-    cancel.removeEventListener('click', decline);
-  };
-  const accept = async () => { cleanup(); dlg.close(); await onOk(); };
-  const decline = () => { cleanup(); dlg.close(); };
-
-  ok.addEventListener('click', accept);
-  cancel.addEventListener('click', decline);
+  $('#confirmOk').textContent = okLabel;
+  confirmAction = onOk;
   if (!dlg.open) dlg.showModal();
 }
 

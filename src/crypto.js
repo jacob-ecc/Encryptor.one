@@ -36,6 +36,11 @@
 //   m   Text
 //   rk  optional: neuer Public Key des Absenders (Schluesselwechsel). Authentifiziert
 //       durch dh_s mit dem bisherigen Schluessel — nur dessen Besitzer kann ihn setzen.
+//   rp  Pflicht zu rk: Besitznachweis fuer den neuen Schluessel, 16 Byte:
+//       HKDF(ECDH(neu, empfaenger), salt, "…/possess" || neu || absender || empf).
+//       Ohne ihn koennte ein Absender als "neuen Schluessel" einen fremden Public Key
+//       eintragen — etwa den eines anderen Kontakts — und dessen Nachrichten umlenken.
+//       Fehlt er oder stimmt er nicht, wird rk ignoriert.
 //   ra  optional: Beglaubigungen von rk durch weitere fruehere Schluessel des Absenders,
 //       je 16 Byte: HKDF(ECDH(frueher, empfaenger), salt, "…/endorse" || frueher || rk || empf).
 //       Noetig nach mehreren Wechseln: Der Empfaenger kennt vielleicht schon einen
@@ -43,7 +48,7 @@
 //       Update nur, wenn genau dieser es beglaubigt.
 //   p   Fuellzeichen. Die Laenge landet auf festen Stufen (mind. 256 Byte, darueber
 //       Padme), damit der Chiffretext nicht die exakte Textlaenge verraet.
-// Aeltere Versionen ignorieren rk und p, das Format bleibt kompatibel.
+// Aeltere Versionen ignorieren rk, rp und p, das Format bleibt kompatibel.
 
 import { enc, dec, concat, b64urlEncode, b64urlDecode, wipe, cleanName } from './util.js';
 
@@ -60,6 +65,7 @@ const MIN_PAYLOAD = 256;
 const HDR_INFO = enc.encode('encryptor.one/v1/hdr');
 const BODY_INFO = enc.encode('encryptor.one/v1/body');
 const ENDORSE_INFO = enc.encode('encryptor.one/v1/endorse');
+const POSSESS_INFO = enc.encode('encryptor.one/v1/possess');
 const MAX_ENDORSE = 8;
 
 export const KDF_ITERATIONS = 600_000;
@@ -208,6 +214,15 @@ async function endorsementTag(dh, salt, endorserRaw, newKeyRaw, recipientRaw) {
   return hkdf(dh, salt, concat(ENDORSE_INFO, endorserRaw, newKeyRaw, recipientRaw), 128);
 }
 
+/** Besitznachweis: nur Inhaber des neuen Schluessels oder der Empfaenger koennen ihn bilden. */
+async function possessionTag(dh, salt, newKeyRaw, senderRaw, recipientRaw) {
+  return hkdf(dh, salt, concat(POSSESS_INFO, newKeyRaw, senderRaw, recipientRaw), 128);
+}
+
+/**
+ * `rotateTo` und jeder Eintrag in `endorsers` sind Schluesselpaare { publicKeyRaw, privateKey }:
+ * Den neuen Schluessel kann nur ankuendigen, wer ihn auch besitzt.
+ */
 export async function encryptMessage({
   text, senderPrivateKey, senderPublicKeyRaw, recipientPublicKeyRaw, rotateTo = null, endorsers = []
 }) {
@@ -225,11 +240,18 @@ export async function encryptMessage({
 
   const body0 = { v: 1, t: Date.now(), m: text };
   if (rotateTo) {
-    body0.rk = b64urlEncode(rotateTo);
+    const newRaw = rotateTo.publicKeyRaw;
+    if (!rotateTo.privateKey || !(await keyPairMatches(rotateTo.privateKey, newRaw))) {
+      throw new CryptoError('bad_key');
+    }
+    body0.rk = b64urlEncode(newRaw);
+    const pop = await ecdh(rotateTo.privateKey, recipientPub);
+    body0.rp = b64urlEncode(await possessionTag(pop, salt, newRaw, senderPublicKeyRaw, recipientPublicKeyRaw));
+    wipe(pop);
     const tags = [];
     for (const e of endorsers.slice(0, MAX_ENDORSE)) {
       const dh = await ecdh(e.privateKey, recipientPub);
-      tags.push(b64urlEncode(await endorsementTag(dh, salt, e.publicKeyRaw, rotateTo, recipientPublicKeyRaw)));
+      tags.push(b64urlEncode(await endorsementTag(dh, salt, e.publicKeyRaw, newRaw, recipientPublicKeyRaw)));
       wipe(dh);
     }
     if (tags.length) body0.ra = tags;
@@ -324,7 +346,7 @@ export async function decryptMessage({ armored, keys, privateKey, publicKeyRaw }
   try { payload = JSON.parse(dec.decode(plain)); } catch { throw new CryptoError('tampered'); }
   wipe(plain);
 
-  const rotateTo = await readRotation(payload.rk, senderPublicKeyRaw);
+  const rotateTo = await readRotation(payload, salt, senderPublicKeyRaw, me);
   const tags = rotateTo && Array.isArray(payload.ra)
     ? payload.ra.slice(0, MAX_ENDORSE).filter((x) => typeof x === 'string' && x.length <= 32)
     : [];
@@ -358,13 +380,21 @@ export async function decryptMessage({ armored, keys, privateKey, publicKeyRaw }
   };
 }
 
-/** Neuer Schluessel aus dem Payload — nur wenn er ein gueltiger Kurvenpunkt ist. */
-async function readRotation(rk, senderPublicKeyRaw) {
+/**
+ * Neuer Schluessel aus dem Payload — nur wenn er ein gueltiger Kurvenpunkt ist und der
+ * Absender per Besitznachweis (rp) zeigt, dass er den privaten Teil auch hat.
+ */
+async function readRotation({ rk, rp }, salt, senderPublicKeyRaw, me) {
   if (typeof rk !== 'string' || rk.length > 100) return null;
+  if (typeof rp !== 'string' || rp.length > 32) return null;
   try {
     const raw = b64urlDecode(rk);
-    await importPublicRaw(raw);
-    return equalBytes(raw, senderPublicKeyRaw) ? null : raw;
+    const pub = await importPublicRaw(raw);
+    if (equalBytes(raw, senderPublicKeyRaw)) return null;
+    const dh = await ecdh(me.privateKey, pub);
+    const want = await possessionTag(dh, salt, raw, senderPublicKeyRaw, me.publicKeyRaw);
+    wipe(dh);
+    return equalBytes(b64urlDecode(rp), want) ? raw : null;
   } catch {
     return null;
   }
