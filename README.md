@@ -27,7 +27,7 @@ src/i18n.js                Deutsch / Englisch
 src/util.js                Base64, DOM-Fabrik ohne innerHTML, Animationen
 sw.js                      Offline-Betrieb
 _headers                   Security-Header für Cloudflare Pages
-test/crypto.test.mjs       52 Tests gegen den Krypto-Kern (bricht bei Fehlern mit Exit-Code 1 ab)
+test/crypto.test.mjs       62 Tests gegen den Krypto-Kern (bricht bei Fehlern mit Exit-Code 1 ab)
 ```
 
 ### Lokal starten
@@ -140,12 +140,12 @@ Offset  Länge   Feld
 209     n       Body                          AAD = bytes[0..209]
 ```
 
-Der Body ist JSON: `{ v, t, m, rk?, p }`. `p` ist Füllung: Die Payload wird auf mindestens
+Der Body ist JSON: `{ v, t, m, rk?, rp?, ra?, p }`. `p` ist Füllung: Die Payload wird auf mindestens
 256 Byte und darüber auf die nächste [Padmé](https://lbarman.ch/blog/padme/)-Stufe
 aufgefüllt (höchstens 12 % Overhead). Ohne Padding verrät die Chiffretextlänge die
-Textlänge aufs Byte — „ja“ und „nein“ wären unterscheidbar. `rk` trägt beim
-Schlüsselwechsel den neuen Public Key (siehe unten). Ältere Versionen ignorieren beide
-Felder; das Format ist in beide Richtungen kompatibel.
+Textlänge aufs Byte — „ja“ und „nein“ wären unterscheidbar. `rk`, `rp` und `ra` gehören
+zum Schlüsselwechsel (siehe unten). Ältere Versionen ignorieren diese Felder; das Format
+ist in beide Richtungen kompatibel.
 
 Das Längenfeld macht den Umschlag selbst-begrenzend. Ohne das bricht die Entschlüsselung,
 sobald jemand den Block mitsamt umgebendem Chatverlauf kopiert — der häufigste Fall
@@ -166,6 +166,13 @@ Payload.rk = neuer Public Key       (durch dh_s authentifiziert)
 Nur wer den bisherigen privaten Schlüssel besitzt, kann ein solches Update erzeugen —
 es ist dieselbe Authentifizierung wie bei jeder Nachricht.
 
+Dazu kommt ein **Besitznachweis** für den neuen Schlüssel (`rp`, 16 Byte, gebildet wie `dh_s`
+mit dem *neuen* privaten Schlüssel, gebunden an Salt, Absender und Empfänger). Ohne ihn
+könnte ein Kontakt als „neuen Schlüssel“ einen fremden Public Key ankündigen — etwa den
+eines anderen Kontakts — und so dessen Nachrichten unter seinem Namen erscheinen lassen.
+Updates ohne gültigen Nachweis (auch die von Version 2.2 und älter) ignoriert die App;
+die Nachricht selbst bleibt lesbar.
+
 Nach mehreren Wechseln reicht das nicht: Alice wechselt K1 → K2, Bob übernimmt K2, antwortet
 aber nicht. Alice wechselt erneut auf K3 und sendet weiter von K1 aus, weil sie nicht weiß,
 dass Bob K2 schon hat. Deshalb beglaubigen **alle** früheren Schlüssel, die Alice noch hat,
@@ -176,10 +183,19 @@ den sie für den Kontakt gespeichert hat, das Update beglaubigt — als Absender
 `ra`. Ein wiedereingespieltes altes Update (Rollback) ändert nichts, ebenso eines von einem
 Unbekannten oder von jemandem, der einen schon ausgemusterten Schlüssel erbeutet hat, etwa
 aus einer alten Sicherung. Hat der Empfänger die neue Kontaktkarte schon separat
-gespeichert, werden beide Einträge zusammengeführt, sofern der zweite ungeprüft ist. Der Prüfstatus („verifiziert“) bleibt erhalten, weil die
-Kette vom verifizierten Schlüssel aus beglaubigt ist; Kontaktdetail und Entschlüsseln-
-Ansicht zeigen den Wechsel aber sichtbar an. Wer nicht warten will, erzeugt im
-Kontaktdetail gezielt eine „Update-Nachricht“.
+gespeichert, werden beide Einträge zusammengeführt, sofern der zweite ungeprüft ist.
+
+Der Prüfstatus fällt bei jedem übernommenen Wechsel auf **„ungeprüft“** zurück — wie bei
+Signal, wenn sich die Sicherheitsnummer ändert. Der Grund: Einen Schlüssel wechselt man
+gerade dann, wenn der alte in falsche Hände geraten sein könnte. Wer ihn hat, kann genauso
+ein beglaubigtes Update auf seinen *eigenen* Schlüssel erzeugen, und kommt es vor dem echten
+an, gewinnt es. Kryptografisch ist das nicht zu unterscheiden; nur ein neuer
+Fingerabdruck-Vergleich deckt es auf. Wer nicht warten will, erzeugt im Kontaktdetail
+gezielt eine „Update-Nachricht“.
+
+Nachrichten, die noch von einem *früheren* Schlüssel eines Kontakts stammen, ordnet die App
+dem Kontakt zu (während eines Wechsels ist das normal), zeigt sie aber nie als
+„verifiziert“, sondern mit dem Hinweis „Früherer Schlüssel“.
 
 Pro Kontakt merkt sich die App, welchen ihrer Schlüssel das Gegenüber kennt (`mk`).
 Solange das ein früherer ist, gehen Nachrichten von diesem aus und tragen `rk`. Sobald
@@ -195,7 +211,12 @@ Frühere Schlüssel werden nach einer einstellbaren Frist gelöscht (7/30/90 Tag
 Standard 30). **Erst das Löschen bringt den Sicherheitsgewinn:** Was an einen gelöschten
 Schlüssel ging, kann auch jemand, der später Gerät *und* Passphrase erbeutet, nicht mehr
 lesen. Das ist keine lückenlose Vorwärtssicherheit wie beim Double Ratchet, begrenzt aber
-das Zeitfenster. Zwei Punkte gehören dazu:
+das Zeitfenster. Drei Punkte gehören dazu:
+
+- Browser löschen IndexedDB-Einträge nicht sicher. Reste des (mit der Passphrase
+  verpackten) alten Schlüssels können noch eine Weile auf dem Datenträger liegen. Gegen
+  jemanden, der später Gerät und Passphrase hat, ist das Löschen deshalb eine starke
+  Bremse, aber keine forensische Garantie.
 
 - Alte **Sicherungsdateien** enthalten alte Schlüssel. Nach einem Wechsel eine neue
   Sicherung exportieren und die alten löschen.
@@ -206,9 +227,14 @@ das Zeitfenster. Zwei Punkte gehören dazu:
 ### Fingerabdruck und Siegel
 
 Aus SHA-256 des Public Keys entstehen 100 Bit in Crockford-Base32 (`6C2R-QZE8-…`) und
-zusätzlich ein **Siegel**: ein deterministisch generiertes Emblem. Zwei Schlüssel zu
-vergleichen, indem man zwanzig Zeichen abliest, macht in der Praxis niemand. Zwei Bilder
-zu vergleichen schon.
+zusätzlich ein **Siegel**: ein deterministisch generiertes Emblem. Zwei Bilder zu
+vergleichen fällt leichter als zwanzig Zeichen, deshalb gibt es das Siegel.
+
+Für die eigentliche Prüfung zählen aber die **Zeichen**. Ein Bild, das ein Mensch auf einen
+Blick vergleicht, trägt weit weniger als 100 Bit: Wer einen Schlüssel unterschieben will,
+kann so lange Schlüssel erzeugen, bis das Siegel dem echten zum Verwechseln ähnlich sieht
+(dasselbe Problem hat die „randomart“ von SSH). An die 100 Bit des Textes kommt er so nicht
+heran. Die App sagt das beim Prüfen auch so.
 
 ---
 
@@ -244,6 +270,13 @@ Anbieter, jemanden mit Zugriff auf das Gerät ohne die Passphrase.
   Vollständige Vorwärtssicherheit bräuchte einen Double Ratchet, der Zustand über
   Nachrichten hinweg voraussetzt. Das passt nicht zu einem Werkzeug, das „kopieren,
   einfügen, fertig" sein soll.
+- **Einen künftigen Quantencomputer („jetzt speichern, später entschlüsseln“).** ECDH auf
+  P-256 fällt gegen einen ausreichend großen Quantencomputer. Chiffretexte liegen in
+  Chatverläufen und deren Cloud-Backups oft jahrelang herum. Der etablierte Schutz ist
+  ein hybrider Schlüsseltausch (ECDH + ML-KEM, FIPS 203), wie ihn Signal (PQXDH), iMessage
+  (PQ3) und TLS inzwischen nutzen. Die Web Crypto API bietet ML-KEM noch nicht in allen
+  Browsern an, und eine JavaScript-Bibliothek dafür wäre die erste Abhängigkeit des
+  Projekts. Das ist ein bewusst offener Punkt für ein künftiges Format `E2`.
 
 Wer gegen einen Angreifer mit Zugriff auf das Endgerät verteidigen muss, braucht Signal,
 nicht dieses Werkzeug.
@@ -259,10 +292,18 @@ Gerätezugriff, für bösartige Erweiterungen und für Forensik-Werkzeuge.
 Der Preis: Passphrase vergessen heißt Identität weg. Es gibt keine Wiederherstellung,
 weil es niemanden gibt, der wiederherstellen könnte. Dagegen hilft der verschlüsselte
 Backup-Export in den Einstellungen — die Sicherung enthält den weiterhin verpackten
-Schlüssel und ist ohne Passphrase nutzlos, kann also gefahrlos in eine Cloud.
+Schlüssel und ist ohne Passphrase nutzlos. In eine Cloud gehört sie trotzdem nur mit einer
+**starken** Passphrase: Wer die Datei hat, kann offline beliebig lange raten, und dann
+stehen nur noch PBKDF2 und die Länge der Passphrase dazwischen.
 
-Die vorgeschlagene Passphrase besteht aus 8 von 130 Wörtern, gleichverteilt gezogen
-(Rejection Sampling statt Modulo): rund 56 Bit.
+Die vorgeschlagene Passphrase besteht aus 10 von 130 Wörtern, gleichverteilt gezogen
+(Rejection Sampling statt Modulo): rund 70 Bit. Mit den 600 000 PBKDF2-Runden (≈ 19 Bit
+zusätzlicher Aufwand pro Versuch) liegt das außerhalb dessen, was sich mit GPUs
+durchprobieren lässt. Eine selbst gewählte Passphrase mit 12 Zeichen erreicht das meist
+nicht.
+
+Nach einem Passphrasenwechsel lassen sich ältere Sicherungen weiterhin mit der *alten*
+Passphrase öffnen. War sie der Grund für den Wechsel, gehören die alten Sicherungen gelöscht.
 
 Drei Fehlversuche löschen **nichts**. Stattdessen wächst die Wartezeit exponentiell
 (gedeckelt bei zwei Minuten). Automatisches Löschen nach Fehlversuchen klingt nach

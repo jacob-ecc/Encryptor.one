@@ -55,12 +55,21 @@ export function wipe(...arrays) {
 /**
  * Anzeigename aus fremder Quelle: ohne Steuer- und Richtungszeichen (U+202E & Co.),
  * mit denen sich ein Name in der Oberflaeche anders darstellen liesse, als er ist.
+ * Ohne Haekchen: Die Empfaengerliste markiert gepruefte Kontakte mit \u201e\u2713\u201c \u2014 eine
+ * Kontaktkarte namens \u201eMama \u2713\u201c saehe sonst aus wie ein verifizierter Kontakt.
  */
 export function cleanName(name) {
   return String(name || '')
     .replace(/[\u0000-\u001f\u007f-\u009f\u061c\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g, '')
+    .replace(/[\u221a\u2611\u2705\u2713\u2714\u{1f5f8}\ufe0e\ufe0f]/gu, '')
+    .replace(/\s{2,}/g, ' ')
     .trim()
     .slice(0, 64);
+}
+
+/** Vergleichsform fuer Namen: gleiche Darstellung, gleiche Form. */
+export function nameKey(name) {
+  return cleanName(name).normalize('NFKC').toLocaleLowerCase();
 }
 
 /* ---------- DOM ---------- */

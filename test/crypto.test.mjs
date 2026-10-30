@@ -4,7 +4,7 @@ import {
   encodeContactCard, parseContactInput, randomBytes, randomInt, keyPairMatches, paddedLength,
   CryptoError, KDF_ITERATIONS
 } from '../src/crypto.js';
-import { b64urlDecode } from '../src/util.js';
+import { b64urlDecode, cleanName, nameKey } from '../src/util.js';
 
 let failed = 0;
 const ok = (label, cond) => {
@@ -199,7 +199,7 @@ console.log('\n--- Schluesselwechsel ---');
 // Alice wechselt von alice -> alice2. Das Update reist mit dem alten Schluessel als Absender.
 const alice2 = await createIdentity(A.wrapKey);
 const upd = await encryptMessage({ text: 'neuer Schluessel', senderPrivateKey: alice.privateKey,
-  senderPublicKeyRaw: alice.publicKeyRaw, recipientPublicKeyRaw: bob.publicKeyRaw, rotateTo: alice2.publicKeyRaw });
+  senderPublicKeyRaw: alice.publicKeyRaw, recipientPublicKeyRaw: bob.publicKeyRaw, rotateTo: alice2 });
 const ru = await decryptMessage({ armored: upd, privateKey: bob.privateKey, publicKeyRaw: bob.publicKeyRaw });
 ok('Update ist vom alten Schluessel authentifiziert', same(ru.senderPublicKeyRaw, alice.publicKeyRaw));
 ok('Empfaenger liest den neuen Schluessel aus', same(ru.rotateTo, alice2.publicKeyRaw));
@@ -209,7 +209,7 @@ ok('Update-Nachricht ist so lang wie eine normale kurze Nachricht',
     senderPublicKeyRaw: alice.publicKeyRaw, recipientPublicKeyRaw: bob.publicKeyRaw })).length);
 
 const selfRot = await encryptMessage({ text: 'x', senderPrivateKey: alice.privateKey,
-  senderPublicKeyRaw: alice.publicKeyRaw, recipientPublicKeyRaw: bob.publicKeyRaw, rotateTo: alice.publicKeyRaw });
+  senderPublicKeyRaw: alice.publicKeyRaw, recipientPublicKeyRaw: bob.publicKeyRaw, rotateTo: alice });
 ok('"Wechsel" auf denselben Schluessel wird ignoriert',
   (await decryptMessage({ armored: selfRot, privateKey: bob.privateKey, publicKeyRaw: bob.publicKeyRaw })).rotateTo === null);
 
@@ -233,7 +233,7 @@ ok('Nach dem Loeschen des alten Schluessels ist die alte Nachricht unlesbar', go
 
 // Update-Feld ist authentifiziert: ein Dritter kann Bob keinen Schluessel fuer Alice unterschieben.
 const forged = await encryptMessage({ text: 'ich bin alice', senderPrivateKey: eve.privateKey,
-  senderPublicKeyRaw: eve.publicKeyRaw, recipientPublicKeyRaw: bob.publicKeyRaw, rotateTo: eve.publicKeyRaw });
+  senderPublicKeyRaw: eve.publicKeyRaw, recipientPublicKeyRaw: bob.publicKeyRaw, rotateTo: eve });
 const rf = await decryptMessage({ armored: forged, privateKey: bob.privateKey, publicKeyRaw: bob.publicKeyRaw });
 ok('Fremdes Update traegt Eves Absender, nicht Alices', same(rf.senderPublicKeyRaw, eve.publicKeyRaw));
 
@@ -244,7 +244,7 @@ const k1 = { privateKey: alice.privateKey, publicKeyRaw: alice.publicKeyRaw };
 const k2 = { privateKey: alice2.privateKey, publicKeyRaw: alice2.publicKeyRaw };
 const dbl = await encryptMessage({ text: 'zwei Wechsel', senderPrivateKey: k1.privateKey,
   senderPublicKeyRaw: k1.publicKeyRaw, recipientPublicKeyRaw: bob.publicKeyRaw,
-  rotateTo: alice3.publicKeyRaw, endorsers: [k2] });
+  rotateTo: alice3, endorsers: [k2] });
 const rd = await decryptMessage({ armored: dbl, privateKey: bob.privateKey, publicKeyRaw: bob.publicKeyRaw });
 ok('Absender (K1) beglaubigt implizit', await rd.vouchedBy(k1.publicKeyRaw));
 ok('K2 beglaubigt per Tag', await rd.vouchedBy(k2.publicKeyRaw));
@@ -252,11 +252,93 @@ ok('Unbeteiligter Schluessel beglaubigt nicht', !(await rd.vouchedBy(eve.publicK
 
 // Ohne Beglaubigung durch K2 (z. B. altes Update wiedereingespielt) -> Bob mit K2 lehnt ab.
 const noTag = await encryptMessage({ text: 'x', senderPrivateKey: k1.privateKey,
-  senderPublicKeyRaw: k1.publicKeyRaw, recipientPublicKeyRaw: bob.publicKeyRaw, rotateTo: alice3.publicKeyRaw });
+  senderPublicKeyRaw: k1.publicKeyRaw, recipientPublicKeyRaw: bob.publicKeyRaw, rotateTo: alice3 });
 ok('Update nur von K1 reicht nicht, wenn Bob schon K2 hat',
   !(await (await decryptMessage({ armored: noTag, privateKey: bob.privateKey, publicKeyRaw: bob.publicKeyRaw })).vouchedBy(k2.publicKeyRaw)));
 
 ok('Normale Nachricht beglaubigt nichts', !(await out.vouchedBy(alice.publicKeyRaw)));
+
+console.log('\n--- Besitznachweis beim Schluesselwechsel ---');
+// Ein Angreifer nutzt eigenen Code, nicht encryptMessage. Deshalb baut dieser Abschnitt
+// Umschlaege von Hand nach dem dokumentierten Format und prueft, was der Empfaenger annimmt.
+const subtle = globalThis.crypto.subtle;
+const te = new TextEncoder();
+const P256 = { name: 'ECDH', namedCurve: 'P-256' };
+const cat = (...a) => {
+  const o = new Uint8Array(a.reduce((n, x) => n + x.length, 0));
+  let i = 0;
+  for (const x of a) { o.set(x, i); i += x.length; }
+  return o;
+};
+const b64u = (b) => Buffer.from(b).toString('base64url');
+const hkdfT = async (ikm, s, info, bits = 256) => new Uint8Array(await subtle.deriveBits(
+  { name: 'HKDF', hash: 'SHA-256', salt: s, info }, await subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']), bits));
+const dhT = async (priv, pubRaw) => new Uint8Array(await subtle.deriveBits(
+  { name: 'ECDH', public: await subtle.importKey('raw', pubRaw, P256, true, []) }, priv, 256));
+const popT = async (newKey, s, senderRaw, recipientRaw) => hkdfT(await dhT(newKey.privateKey, recipientRaw), s,
+  cat(te.encode('encryptor.one/v1/possess'), newKey.publicKeyRaw, senderRaw, recipientRaw), 128);
+
+async function handmade(makePayload, sender, recipientRaw, salt = randomBytes(32)) {
+  const eph = await subtle.generateKey(P256, true, ['deriveBits']);
+  const ephRaw = new Uint8Array(await subtle.exportKey('raw', eph.publicKey));
+  const iv0 = randomBytes(12), iv1 = randomBytes(12);
+  const dhE = await dhT(eph.privateKey, recipientRaw);
+  const dhS = await dhT(sender.privateKey, recipientRaw);
+  const body = te.encode(JSON.stringify(await makePayload(salt)));
+  const n = body.length + 16;
+  const head = cat(te.encode('E1'), Uint8Array.of(0, n >>> 24, n >>> 16, n >>> 8, n), salt, ephRaw, iv0);
+  const kHdr = await subtle.importKey('raw', await hkdfT(dhE, salt, cat(te.encode('encryptor.one/v1/hdr'), ephRaw)),
+    'AES-GCM', false, ['encrypt']);
+  const sealed = new Uint8Array(await subtle.encrypt({ name: 'AES-GCM', iv: iv0, additionalData: head }, kHdr, sender.publicKeyRaw));
+  const head2 = cat(head, sealed, iv1);
+  const kBody = await subtle.importKey('raw', await hkdfT(cat(dhE, dhS), salt,
+    cat(te.encode('encryptor.one/v1/body'), ephRaw, sender.publicKeyRaw, recipientRaw)), 'AES-GCM', false, ['encrypt']);
+  const ct = new Uint8Array(await subtle.encrypt({ name: 'AES-GCM', iv: iv1, additionalData: head2 }, kBody, body));
+  return 'ENC1.' + b64u(cat(head2, ct));
+}
+const bobOpens = async (armored) => decryptMessage({ armored, privateKey: bob.privateKey, publicKeyRaw: bob.publicKeyRaw });
+
+// Eve ist ein echter Kontakt von Bob und will ihm Carols Schluessel als ihren "neuen" unterschieben.
+const carol = await createIdentity(C.wrapKey);
+const eve2 = await createIdentity(C.wrapKey);
+const base = { v: 1, t: Date.now(), m: 'neuer Schluessel' };
+
+const honest = await bobOpens(await handmade(async (s) => ({ ...base,
+  rk: b64u(eve2.publicKeyRaw), rp: b64u(await popT(eve2, s, eve.publicKeyRaw, bob.publicKeyRaw)) }), eve, bob.publicKeyRaw));
+ok('Handgebauter Umschlag mit gueltigem Besitznachweis wird angenommen (Format stimmt)', same(honest.rotateTo, eve2.publicKeyRaw));
+
+const noProof = await bobOpens(await handmade(async () => ({ ...base, rk: b64u(carol.publicKeyRaw) }), eve, bob.publicKeyRaw));
+ok('Update ohne Besitznachweis wird ignoriert (auch von alten Versionen)', noProof.rotateTo === null && noProof.text === base.m);
+
+const ownProof = await bobOpens(await handmade(async (s) => ({ ...base, rk: b64u(carol.publicKeyRaw),
+  rp: b64u(await popT({ privateKey: eve.privateKey, publicKeyRaw: carol.publicKeyRaw }, s, eve.publicKeyRaw, bob.publicKeyRaw)) }),
+  eve, bob.publicKeyRaw));
+ok('Fremder Schluessel mit Nachweis vom eigenen privaten Schluessel wird ignoriert', ownProof.rotateTo === null);
+
+const junkProof = await bobOpens(await handmade(async () => ({ ...base,
+  rk: b64u(carol.publicKeyRaw), rp: b64u(randomBytes(16)) }), eve, bob.publicKeyRaw));
+ok('Zufaelliger Besitznachweis wird ignoriert', junkProof.rotateTo === null);
+
+const oldSalt = randomBytes(32);
+const oldProof = b64u(await popT(eve2, oldSalt, eve.publicKeyRaw, bob.publicKeyRaw));
+const replayed = await bobOpens(await handmade(async () => ({ ...base, rk: b64u(eve2.publicKeyRaw), rp: oldProof }),
+  eve, bob.publicKeyRaw));
+ok('Besitznachweis aus einer anderen Nachricht gilt nicht (an Salt gebunden)', replayed.rotateTo === null);
+
+let senderRefuses = false;
+try {
+  await encryptMessage({ text: 'x', senderPrivateKey: eve.privateKey, senderPublicKeyRaw: eve.publicKeyRaw,
+    recipientPublicKeyRaw: bob.publicKeyRaw, rotateTo: { publicKeyRaw: carol.publicKeyRaw, privateKey: eve.privateKey } });
+} catch (e) { senderRefuses = e instanceof CryptoError && e.code === 'bad_key'; }
+ok('encryptMessage kuendigt keinen Schluessel an, dessen privaten Teil es nicht hat', senderRefuses);
+
+console.log('\n--- Namen ---');
+ok('Haekchen im Namen werden entfernt', cleanName('Mama ✓') === 'Mama' && cleanName('Bob ✔️') === 'Bob'
+  && cleanName('Max ✅ B.') === 'Max B.');
+ok('Richtungszeichen im Namen werden entfernt', cleanName('Al‮ice') === 'Alice');
+ok('Kontaktkarte kann kein Haekchen in den Namen schmuggeln',
+  parseContactInput(encodeContactCard('Mama ✓', alice.publicKeyRaw)).name === 'Mama');
+ok('Namensvergleich ignoriert Gross/Klein und Unicode-Form', nameKey('Käthe') === nameKey('KÄTHE'));
 
 console.log('\n--- Zufall ---');
 const counts = new Array(130).fill(0);
